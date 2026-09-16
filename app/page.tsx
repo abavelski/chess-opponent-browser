@@ -35,9 +35,14 @@ export default async function Home() {
             Open a tournament to prepare for its potential opponents.
           </p>
         </div>
-        <Link className="button" href="/tournaments/new">
-          Create tournament
-        </Link>
+        <div className="page-header-actions">
+          <Link className="button secondary-button" href="/imports/new">
+            Import games
+          </Link>
+          <Link className="button" href="/tournaments/new">
+            Create tournament
+          </Link>
+        </div>
       </header>
 
       <section aria-labelledby="tournaments-heading" className="section-stack">
@@ -63,10 +68,7 @@ export default async function Home() {
           <ul className="tournament-list">
             {tournamentRows.map((tournament) => (
               <li key={tournament.id}>
-                <Link
-                  className="tournament-card"
-                  href={`/tournaments/${tournament.id}`}
-                >
+                <Link className="tournament-card" href={`/tournaments/${tournament.id}`}>
                   <span className="tournament-name">{tournament.name}</span>
                   <span aria-hidden="true" className="card-arrow">
                     →

@@ -1,0 +1,144 @@
+.import-stack {
+  display: grid;
+  gap: 2.5rem;
+}
+
+.import-form-panel {
+  max-width: 48rem;
+}
+
+.helper-text {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.import-form-panel input[type="file"] {
+  padding: 0.6rem;
+}
+
+.import-form-panel button:disabled {
+  cursor: progress;
+  opacity: 0.65;
+}
+
+.import-preview-section {
+  gap: 1rem;
+}
+
+.import-preview-heading {
+  justify-content: space-between;
+}
+
+.import-preview-heading .eyebrow {
+  margin-bottom: 0.35rem;
+}
+
+.import-preview-filename {
+  max-width: 24rem;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.import-notice {
+  margin: 0;
+  padding: 1rem 1.15rem;
+  border-left: 4px solid var(--accent);
+}
+
+.import-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.import-summary > div {
+  padding: 1rem;
+}
+
+.import-summary dt,
+.import-game-metadata dt {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.import-summary dd {
+  margin: 0.25rem 0 0;
+  font-size: 1.7rem;
+  font-weight: 700;
+}
+
+.import-errors {
+  padding: 1rem 1.15rem;
+  border-color: #e6baba;
+}
+
+.import-errors ul {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.import-game-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: none;
+}
+
+.import-game-card {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem 1.15rem;
+}
+
+.import-game-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.import-game-metadata {
+  display: grid;
+  grid-template-columns: minmax(8rem, 0.6fr) minmax(12rem, 1fr) minmax(12rem, 1.25fr);
+  gap: 1rem;
+  margin: 0;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--border);
+}
+
+.import-game-metadata dd {
+  margin: 0.25rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .import-preview-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .import-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .import-game-metadata {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .import-summary {
+    grid-template-columns: 1fr;
+  }
+}
