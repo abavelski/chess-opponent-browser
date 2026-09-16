@@ -1,26 +1,308 @@
 @import "tailwindcss";
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
+  --background: #f6f7f3;
+  --surface: #ffffff;
+  --surface-muted: #f0f2ed;
+  --text: #172018;
+  --muted: #667066;
+  --border: #d8ddd5;
+  --accent: #24543a;
+  --accent-strong: #173d29;
+  --danger: #a12626;
+  --focus: #6d8f78;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
+  background: var(--background);
+  color: var(--text);
   font-family: Arial, Helvetica, sans-serif;
 }
 
-main {
-  max-width: 48rem;
+a {
+  color: inherit;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.app-shell {
+  width: min(100% - 2rem, 64rem);
   margin: 0 auto;
-  padding: 4rem 1.5rem;
+  padding: 4rem 0;
+}
+
+.narrow-shell {
+  width: min(100% - 2rem, 46rem);
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+
+.detail-header {
+  margin: 1.5rem 0 3rem;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
 }
 
 h1 {
-  margin: 0 0 1rem;
-  font-size: 2rem;
+  margin-bottom: 0.75rem;
+  font-size: clamp(2rem, 5vw, 3rem);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+}
+
+h2 {
+  margin-bottom: 0;
+  font-size: 1.35rem;
+}
+
+h3 {
+  margin-bottom: 0.5rem;
+  font-size: 1.05rem;
 }
 
 p {
   line-height: 1.6;
+}
+
+.eyebrow {
+  margin-bottom: 0.6rem;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.page-intro {
+  max-width: 38rem;
+  margin-bottom: 0;
+}
+
+.button {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.6rem;
+  background: var(--accent);
+  color: #ffffff;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+}
+
+.button:focus-visible,
+.text-link:focus-visible,
+.back-link:focus-visible,
+.tournament-card:focus-visible,
+input:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.secondary-button {
+  background: transparent;
+  color: var(--accent);
+}
+
+.secondary-button:hover {
+  background: var(--surface-muted);
+  color: var(--accent-strong);
+}
+
+.text-link,
+.back-link {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.text-link:hover,
+.back-link:hover {
+  text-decoration: underline;
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 1.75rem;
+}
+
+.section-stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.count-badge {
+  display: inline-flex;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.panel {
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  background: var(--surface);
+}
+
+.empty-state {
+  padding: 1.5rem;
+}
+
+.empty-state p:last-of-type {
+  margin-bottom: 1rem;
+}
+
+.tournament-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tournament-card {
+  display: flex;
+  min-height: 4.25rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  background: var(--surface);
+  text-decoration: none;
+}
+
+.tournament-card:hover {
+  border-color: var(--focus);
+}
+
+.tournament-name {
+  font-weight: 700;
+}
+
+.card-arrow {
+  color: var(--accent);
+  font-size: 1.2rem;
+}
+
+.form-panel {
+  padding: 1.75rem;
+}
+
+.form-panel h1 {
+  font-size: clamp(1.8rem, 5vw, 2.4rem);
+}
+
+.stack-form {
+  display: grid;
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+.field-group {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.field-group label {
+  font-weight: 700;
+}
+
+.field-group input {
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  background: #ffffff;
+  color: var(--text);
+}
+
+.form-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .app-shell {
+    width: min(100% - 1.25rem, 64rem);
+    padding: 2rem 0;
+  }
+
+  .page-header {
+    flex-direction: column;
+    margin-bottom: 2rem;
+  }
+
+  .page-header .button {
+    width: 100%;
+  }
+
+  .form-panel,
+  .empty-state {
+    padding: 1.25rem;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .form-actions .button {
+    width: 100%;
+  }
 }
