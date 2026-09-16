@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getEnvironmentLabel } from "@/lib/environment";
+import { getEnvironmentLabel } from "../lib/environment";
 
 describe("getEnvironmentLabel", () => {
   it("uses Vercel's production environment when present", () => {
