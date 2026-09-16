@@ -50,7 +50,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
           ← Tournaments
         </Link>
         <section className="panel empty-state" role="alert">
-          <h1>Tournament couldn't be loaded</h1>
+          <h1>Tournament could not be loaded</h1>
           <p>Try refreshing the page. If the problem continues, check the database health.</p>
         </section>
       </main>

@@ -48,7 +48,7 @@ export default async function Home() {
 
         {loadError ? (
           <div className="panel empty-state" role="alert">
-            <h3>Tournaments couldn't be loaded</h3>
+            <h3>Tournaments could not be loaded</h3>
             <p>Try refreshing the page. If the problem continues, check the database health.</p>
           </div>
         ) : tournamentRows.length === 0 ? (
