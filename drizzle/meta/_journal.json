@@ -15,6 +15,13 @@
       "when": 1789585800000,
       "tag": "0001_create_tournaments",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789586400000,
+      "tag": "0002_manage_tournament_opponents",
+      "breakpoints": true
     }
   ]
 }

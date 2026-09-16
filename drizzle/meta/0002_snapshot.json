@@ -1,0 +1,93 @@
+{
+  "id": "17b3db3e-4514-4621-9360-7c9f73444be1",
+  "prevId": "e716e6ea-26cd-4617-93a7-bfe3abcf045f",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.app_metadata": {
+      "name": "app_metadata",
+      "schema": "",
+      "columns": {
+        "id": {"name": "id", "type": "serial", "primaryKey": true, "notNull": true},
+        "key": {"name": "key", "type": "varchar(128)", "primaryKey": false, "notNull": true},
+        "value": {"name": "value", "type": "text", "primaryKey": false, "notNull": true},
+        "created_at": {"name": "created_at", "type": "timestamp with time zone", "primaryKey": false, "notNull": true, "default": "now()"}
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {"app_metadata_key_unique": {"name": "app_metadata_key_unique", "nullsNotDistinct": false, "columns": ["key"]}},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tournaments": {
+      "name": "tournaments",
+      "schema": "",
+      "columns": {
+        "id": {"name": "id", "type": "serial", "primaryKey": true, "notNull": true},
+        "name": {"name": "name", "type": "varchar(200)", "primaryKey": false, "notNull": true},
+        "created_at": {"name": "created_at", "type": "timestamp with time zone", "primaryKey": false, "notNull": true, "default": "now()"}
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {"tournaments_name_not_blank": {"name": "tournaments_name_not_blank", "value": "char_length(btrim(\"tournaments\".\"name\")) > 0"}},
+      "isRLSEnabled": false
+    },
+    "public.players": {
+      "name": "players",
+      "schema": "",
+      "columns": {
+        "id": {"name": "id", "type": "serial", "primaryKey": true, "notNull": true},
+        "name": {"name": "name", "type": "varchar(200)", "primaryKey": false, "notNull": true},
+        "fide_id": {"name": "fide_id", "type": "varchar(32)", "primaryKey": false, "notNull": false},
+        "created_at": {"name": "created_at", "type": "timestamp with time zone", "primaryKey": false, "notNull": true, "default": "now()"}
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {"players_fide_id_unique": {"name": "players_fide_id_unique", "nullsNotDistinct": false, "columns": ["fide_id"]}},
+      "policies": {},
+      "checkConstraints": {
+        "players_name_not_blank": {"name": "players_name_not_blank", "value": "char_length(btrim(\"players\".\"name\")) > 0"},
+        "players_fide_id_not_blank": {"name": "players_fide_id_not_blank", "value": "\"players\".\"fide_id\" is null or char_length(btrim(\"players\".\"fide_id\")) > 0"}
+      },
+      "isRLSEnabled": false
+    },
+    "public.tournament_participants": {
+      "name": "tournament_participants",
+      "schema": "",
+      "columns": {
+        "id": {"name": "id", "type": "serial", "primaryKey": true, "notNull": true},
+        "tournament_id": {"name": "tournament_id", "type": "integer", "primaryKey": false, "notNull": true},
+        "player_id": {"name": "player_id", "type": "integer", "primaryKey": false, "notNull": true},
+        "rating": {"name": "rating", "type": "integer", "primaryKey": false, "notNull": false},
+        "federation": {"name": "federation", "type": "varchar(3)", "primaryKey": false, "notNull": false},
+        "created_at": {"name": "created_at", "type": "timestamp with time zone", "primaryKey": false, "notNull": true, "default": "now()"}
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "tournament_participants_tournament_id_tournaments_id_fk": {"name": "tournament_participants_tournament_id_tournaments_id_fk", "tableFrom": "tournament_participants", "tableTo": "tournaments", "columnsFrom": ["tournament_id"], "columnsTo": ["id"], "onDelete": "cascade", "onUpdate": "no action"},
+        "tournament_participants_player_id_players_id_fk": {"name": "tournament_participants_player_id_players_id_fk", "tableFrom": "tournament_participants", "tableTo": "players", "columnsFrom": ["player_id"], "columnsTo": ["id"], "onDelete": "cascade", "onUpdate": "no action"}
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {"tournament_participants_tournament_player_unique": {"name": "tournament_participants_tournament_player_unique", "nullsNotDistinct": false, "columns": ["tournament_id", "player_id"]}},
+      "policies": {},
+      "checkConstraints": {
+        "tournament_participants_rating_range": {"name": "tournament_participants_rating_range", "value": "\"tournament_participants\".\"rating\" is null or (\"tournament_participants\".\"rating\" >= 1 and \"tournament_participants\".\"rating\" <= 4000)"},
+        "tournament_participants_federation_format": {"name": "tournament_participants_federation_format", "value": "\"tournament_participants\".\"federation\" is null or \"tournament_participants\".\"federation\" ~ '^[A-Z]{3}$'"}
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {"columns": {}, "schemas": {}, "tables": {}}
+}

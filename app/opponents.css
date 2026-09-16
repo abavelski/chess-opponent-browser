@@ -1,0 +1,169 @@
+.section-heading-with-action {
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.roster-search {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  background: var(--surface);
+}
+
+.roster-search label {
+  font-weight: 700;
+}
+
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.search-row input {
+  min-width: 0;
+  min-height: 2.75rem;
+  flex: 1;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  background: #ffffff;
+  color: var(--text);
+}
+
+.search-clear {
+  white-space: nowrap;
+}
+
+.participant-list {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.participant-card {
+  display: flex;
+  min-height: 4.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  background: var(--surface);
+  text-decoration: none;
+}
+
+.participant-card:hover {
+  border-color: var(--focus);
+}
+
+.participant-main,
+.participant-meta {
+  display: flex;
+  min-width: 0;
+}
+
+.participant-main {
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.participant-meta {
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.form-grid .field-group:first-child {
+  grid-column: 1 / -1;
+}
+
+.helper-text {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.identity-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  overflow: hidden;
+}
+
+.identity-grid div {
+  padding: 1.2rem;
+  border-right: 1px solid var(--border);
+}
+
+.identity-grid div:last-child {
+  border-right: 0;
+}
+
+.identity-grid dt {
+  margin-bottom: 0.35rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.identity-grid dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.games-empty-section {
+  margin-top: 2.5rem;
+}
+
+@media (max-width: 640px) {
+  .section-heading-with-action {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .section-heading-with-action > .button {
+    width: 100%;
+  }
+
+  .search-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .search-row .button {
+    width: 100%;
+  }
+
+  .form-grid,
+  .identity-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid .field-group:first-child {
+    grid-column: auto;
+  }
+
+  .identity-grid div {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .identity-grid div:last-child {
+    border-bottom: 0;
+  }
+}
