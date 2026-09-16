@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Chessboard } from "react-chessboard";
 
 import {
-  boardSquaresFromFen,
   endSelection,
   findReplayLine,
   nextSelection,
@@ -24,36 +24,6 @@ type NotationLineProps = {
   selected: ReplaySelection;
   onSelect: (selection: ReplaySelection) => void;
   depth?: number;
-};
-
-const pieceGlyphs: Record<string, string> = {
-  K: "♔",
-  Q: "♕",
-  R: "♖",
-  B: "♗",
-  N: "♘",
-  P: "♙",
-  k: "♚",
-  q: "♛",
-  r: "♜",
-  b: "♝",
-  n: "♞",
-  p: "♟",
-};
-
-const pieceNames: Record<string, string> = {
-  K: "White king",
-  Q: "White queen",
-  R: "White rook",
-  B: "White bishop",
-  N: "White knight",
-  P: "White pawn",
-  k: "Black king",
-  q: "Black queen",
-  r: "Black rook",
-  b: "Black bishop",
-  n: "Black knight",
-  p: "Black pawn",
 };
 
 function notationPrefix(moveNumber: number, side: "white" | "black") {
@@ -108,8 +78,6 @@ export function GameViewer({ replay }: GameViewerProps) {
   const currentLine = findReplayLine(replay, selection.lineId);
   const currentMove = selection.index >= 0 ? currentLine?.moves[selection.index] ?? null : null;
   const fen = selectionFen(replay, selection) ?? replay.initialFen;
-  const squares = useMemo(() => boardSquaresFromFen(fen), [fen]);
-  const displaySquares = flipped ? [...squares].reverse() : squares;
   const previous = previousSelection(replay, selection);
   const next = nextSelection(replay, selection);
   const end = endSelection(replay);
@@ -118,30 +86,33 @@ export function GameViewer({ replay }: GameViewerProps) {
   const positionLabel = currentMove
     ? `${notationPrefix(currentMove.moveNumber, currentMove.side)} ${currentMove.san}`
     : "Starting position";
+  const boardOptions = useMemo(
+    () => ({
+      id: "game-replay-board",
+      position: fen,
+      boardOrientation: flipped ? ("black" as const) : ("white" as const),
+      allowDragging: false,
+      allowDrawingArrows: false,
+      showNotation: true,
+      showAnimations: true,
+      animationDurationInMs: 180,
+      boardStyle: {
+        borderRadius: "0.7rem",
+        boxShadow: "0 0.3rem 1.2rem rgb(23 32 24 / 12%)",
+      },
+    }),
+    [fen, flipped],
+  );
 
   return (
     <div className="viewer-layout">
       <section aria-label="Chessboard and replay controls" className="board-column">
-        <div aria-label={`Chess position: ${positionLabel}`} className="chessboard" role="img">
-          {displaySquares.map(({ square, piece }) => {
-            const fileIndex = square.charCodeAt(0) - 97;
-            const rank = Number(square[1]);
-            const isDark = (fileIndex + rank) % 2 === 1;
-            return (
-              <div
-                aria-label={piece ? `${square}: ${pieceNames[piece]}` : `${square}: empty`}
-                className={`board-square ${isDark ? "dark-square" : "light-square"}`}
-                key={square}
-              >
-                <span aria-hidden="true" className="board-piece">
-                  {piece ? pieceGlyphs[piece] : ""}
-                </span>
-                <span aria-hidden="true" className="square-coordinate">
-                  {square}
-                </span>
-              </div>
-            );
-          })}
+        <div
+          aria-label={`Chess position: ${positionLabel}`}
+          className="chessboard-library"
+          role="img"
+        >
+          <Chessboard options={boardOptions} />
         </div>
 
         <div aria-label="Game navigation" className="viewer-controls">
