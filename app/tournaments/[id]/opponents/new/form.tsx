@@ -4,11 +4,15 @@ import { useActionState } from "react";
 
 import {
   addOpponentAction,
-  initialAddOpponentState,
+  type AddOpponentState,
 } from "./actions";
 
 type AddOpponentFormProps = {
   tournamentId: number;
+};
+
+const initialAddOpponentState: AddOpponentState = {
+  values: { name: "", fideId: "", federation: "", rating: "" },
 };
 
 export function AddOpponentForm({ tournamentId }: AddOpponentFormProps) {
