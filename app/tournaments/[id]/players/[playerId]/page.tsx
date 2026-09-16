@@ -1,9 +1,21 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, or, sql } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { getDb } from "@/lib/db";
-import { players, tournamentParticipants, tournaments } from "@/lib/db/schema";
+import {
+  games,
+  gameSources,
+  players,
+  tournamentParticipants,
+  tournaments,
+} from "@/lib/db/schema";
+import {
+  mapGameForPlayer,
+  openingLabel,
+  type PlayerGameListItem,
+  type StoredGameListRow,
+} from "@/lib/games/presentation";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +30,13 @@ function parsePositiveId(value: string) {
 
   const id = Number(value);
   return Number.isSafeInteger(id) ? id : null;
+}
+
+function resultClass(result: PlayerGameListItem["result"]) {
+  if (result === "Win") return "result-win";
+  if (result === "Loss") return "result-loss";
+  if (result === "Draw") return "result-draw";
+  return "result-unknown";
 }
 
 export default async function PlayerPage({ params }: PlayerPageProps) {
@@ -38,9 +57,12 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
         rating: number | null;
       }
     | undefined;
+  let gameItems: PlayerGameListItem[] = [];
 
   try {
-    [detail] = await getDb()
+    const db = getDb();
+
+    [detail] = await db
       .select({
         tournamentName: tournaments.name,
         playerName: players.name,
@@ -58,6 +80,36 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
         ),
       )
       .limit(1);
+
+    if (detail) {
+      const gameRows = await db
+        .select({
+          id: games.id,
+          whitePlayerId: games.whitePlayerId,
+          blackPlayerId: games.blackPlayerId,
+          whiteName: games.whiteName,
+          blackName: games.blackName,
+          whiteRating: games.whiteRating,
+          blackRating: games.blackRating,
+          playedOn: games.playedOn,
+          result: games.result,
+          event: games.event,
+          eco: games.eco,
+          opening: games.opening,
+          sourceLabel: gameSources.label,
+        })
+        .from(games)
+        .innerJoin(gameSources, eq(games.sourceId, gameSources.id))
+        .where(or(eq(games.whitePlayerId, playerId), eq(games.blackPlayerId, playerId)))
+        .orderBy(sql`${games.playedOn} desc nulls last`, desc(games.id));
+
+      gameItems = gameRows.map((row) =>
+        mapGameForPlayer(playerId, {
+          ...row,
+          result: row.result as StoredGameListRow["result"],
+        }),
+      );
+    }
   } catch (error) {
     console.error("Failed to load tournament player", error);
 
@@ -79,17 +131,17 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
   }
 
   return (
-    <main className="app-shell narrow-shell">
+    <main className="app-shell">
       <Link className="back-link" href={`/tournaments/${tournamentId}`}>
         ← {detail.tournamentName}
       </Link>
 
-      <header className="detail-header">
+      <header className="detail-header player-detail-header">
         <p className="eyebrow">Potential opponent</p>
         <h1>{detail.playerName}</h1>
       </header>
 
-      <section aria-labelledby="identity-heading" className="section-stack">
+      <section aria-labelledby="identity-heading" className="section-stack player-identity-section">
         <h2 id="identity-heading">Player details</h2>
         <dl className="panel identity-grid">
           <div>
@@ -107,12 +159,50 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
         </dl>
       </section>
 
-      <section aria-labelledby="games-heading" className="section-stack games-empty-section">
-        <h2 id="games-heading">Known games</h2>
-        <div className="panel empty-state">
-          <h3>No known games yet</h3>
-          <p>Game library browsing will be added in the next implementation task.</p>
+      <section aria-labelledby="games-heading" className="section-stack games-section">
+        <div className="section-heading">
+          <h2 id="games-heading">Known games</h2>
+          <span className="count-badge">{gameItems.length}</span>
         </div>
+
+        {gameItems.length === 0 ? (
+          <div className="panel empty-state">
+            <h3>No known games yet</h3>
+            <p>No globally stored games are linked to this player yet.</p>
+          </div>
+        ) : (
+          <ul className="game-list">
+            {gameItems.map((game) => (
+              <li className="panel game-card" key={game.id}>
+                <div className="game-card-topline">
+                  <span className="game-date">{game.date ?? "—"}</span>
+                  <span className="color-pill">{game.color}</span>
+                  <span className={`result-pill ${resultClass(game.result)}`}>{game.result}</span>
+                </div>
+
+                <div className="game-opponent">
+                  <strong>{game.opponentName}</strong>
+                  <span>{game.opponentRating ? `Rating ${game.opponentRating}` : "Rating —"}</span>
+                </div>
+
+                <dl className="game-metadata">
+                  <div>
+                    <dt>Event</dt>
+                    <dd>{game.event ?? "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>Opening</dt>
+                    <dd>{openingLabel(game.eco, game.opening)}</dd>
+                  </div>
+                  <div>
+                    <dt>Source</dt>
+                    <dd>{game.sourceLabel}</dd>
+                  </div>
+                </dl>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </main>
   );

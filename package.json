@@ -11,7 +11,8 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:seed:task-003": "node scripts/seed-task-003.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "1.1.0",

@@ -1,0 +1,159 @@
+{
+  "id": "8ef94a9d-4e0b-44d1-8e45-5e563dd4f841",
+  "prevId": "17b3db3e-4514-4621-9360-7c9f73444be1",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.app_metadata": {
+      "name": "app_metadata",
+      "schema": "",
+      "columns": {
+        "id": {"name": "id", "type": "serial", "primaryKey": true, "notNull": true},
+        "key": {"name": "key", "type": "varchar(128)", "primaryKey": false, "notNull": true},
+        "value": {"name": "value", "type": "text", "primaryKey": false, "notNull": true},
+        "created_at": {"name": "created_at", "type": "timestamp with time zone", "primaryKey": false, "notNull": true, "default": "now()"}
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {"app_metadata_key_unique": {"name": "app_metadata_key_unique", "nullsNotDistinct": false, "columns": ["key"]}},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tournaments": {
+      "name": "tournaments",
+      "schema": "",
+      "columns": {
+        "id": {"name": "id", "type": "serial", "primaryKey": true, "notNull": true},
+        "name": {"name": "name", "type": "varchar(200)", "primaryKey": false, "notNull": true},
+        "created_at": {"name": "created_at", "type": "timestamp with time zone", "primaryKey": false, "notNull": true, "default": "now()"}
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {"tournaments_name_not_blank": {"name": "tournaments_name_not_blank", "value": "char_length(btrim(\"tournaments\".\"name\")) > 0"}},
+      "isRLSEnabled": false
+    },
+    "public.players": {
+      "name": "players",
+      "schema": "",
+      "columns": {
+        "id": {"name": "id", "type": "serial", "primaryKey": true, "notNull": true},
+        "name": {"name": "name", "type": "varchar(200)", "primaryKey": false, "notNull": true},
+        "fide_id": {"name": "fide_id", "type": "varchar(32)", "primaryKey": false, "notNull": false},
+        "created_at": {"name": "created_at", "type": "timestamp with time zone", "primaryKey": false, "notNull": true, "default": "now()"}
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {"players_fide_id_unique": {"name": "players_fide_id_unique", "nullsNotDistinct": false, "columns": ["fide_id"]}},
+      "policies": {},
+      "checkConstraints": {
+        "players_name_not_blank": {"name": "players_name_not_blank", "value": "char_length(btrim(\"players\".\"name\")) > 0"},
+        "players_fide_id_not_blank": {"name": "players_fide_id_not_blank", "value": "\"players\".\"fide_id\" is null or char_length(btrim(\"players\".\"fide_id\")) > 0"}
+      },
+      "isRLSEnabled": false
+    },
+    "public.tournament_participants": {
+      "name": "tournament_participants",
+      "schema": "",
+      "columns": {
+        "id": {"name": "id", "type": "serial", "primaryKey": true, "notNull": true},
+        "tournament_id": {"name": "tournament_id", "type": "integer", "primaryKey": false, "notNull": true},
+        "player_id": {"name": "player_id", "type": "integer", "primaryKey": false, "notNull": true},
+        "rating": {"name": "rating", "type": "integer", "primaryKey": false, "notNull": false},
+        "federation": {"name": "federation", "type": "varchar(3)", "primaryKey": false, "notNull": false},
+        "created_at": {"name": "created_at", "type": "timestamp with time zone", "primaryKey": false, "notNull": true, "default": "now()"}
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "tournament_participants_tournament_id_tournaments_id_fk": {"name": "tournament_participants_tournament_id_tournaments_id_fk", "tableFrom": "tournament_participants", "tableTo": "tournaments", "columnsFrom": ["tournament_id"], "columnsTo": ["id"], "onDelete": "cascade", "onUpdate": "no action"},
+        "tournament_participants_player_id_players_id_fk": {"name": "tournament_participants_player_id_players_id_fk", "tableFrom": "tournament_participants", "tableTo": "players", "columnsFrom": ["player_id"], "columnsTo": ["id"], "onDelete": "cascade", "onUpdate": "no action"}
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {"tournament_participants_tournament_player_unique": {"name": "tournament_participants_tournament_player_unique", "nullsNotDistinct": false, "columns": ["tournament_id", "player_id"]}},
+      "policies": {},
+      "checkConstraints": {
+        "tournament_participants_rating_range": {"name": "tournament_participants_rating_range", "value": "\"tournament_participants\".\"rating\" is null or (\"tournament_participants\".\"rating\" >= 1 and \"tournament_participants\".\"rating\" <= 4000)"},
+        "tournament_participants_federation_format": {"name": "tournament_participants_federation_format", "value": "\"tournament_participants\".\"federation\" is null or \"tournament_participants\".\"federation\" ~ '^[A-Z]{3}$'"}
+      },
+      "isRLSEnabled": false
+    },
+    "public.game_sources": {
+      "name": "game_sources",
+      "schema": "",
+      "columns": {
+        "id": {"name": "id", "type": "serial", "primaryKey": true, "notNull": true},
+        "source_key": {"name": "source_key", "type": "varchar(64)", "primaryKey": false, "notNull": true},
+        "label": {"name": "label", "type": "varchar(120)", "primaryKey": false, "notNull": true},
+        "is_fixture": {"name": "is_fixture", "type": "boolean", "primaryKey": false, "notNull": true, "default": "false"},
+        "created_at": {"name": "created_at", "type": "timestamp with time zone", "primaryKey": false, "notNull": true, "default": "now()"}
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {"game_sources_source_key_unique": {"name": "game_sources_source_key_unique", "nullsNotDistinct": false, "columns": ["source_key"]}},
+      "policies": {},
+      "checkConstraints": {
+        "game_sources_source_key_not_blank": {"name": "game_sources_source_key_not_blank", "value": "char_length(btrim(\"game_sources\".\"source_key\")) > 0"},
+        "game_sources_label_not_blank": {"name": "game_sources_label_not_blank", "value": "char_length(btrim(\"game_sources\".\"label\")) > 0"}
+      },
+      "isRLSEnabled": false
+    },
+    "public.games": {
+      "name": "games",
+      "schema": "",
+      "columns": {
+        "id": {"name": "id", "type": "serial", "primaryKey": true, "notNull": true},
+        "white_player_id": {"name": "white_player_id", "type": "integer", "primaryKey": false, "notNull": false},
+        "black_player_id": {"name": "black_player_id", "type": "integer", "primaryKey": false, "notNull": false},
+        "white_name": {"name": "white_name", "type": "varchar(200)", "primaryKey": false, "notNull": true},
+        "black_name": {"name": "black_name", "type": "varchar(200)", "primaryKey": false, "notNull": true},
+        "white_rating": {"name": "white_rating", "type": "integer", "primaryKey": false, "notNull": false},
+        "black_rating": {"name": "black_rating", "type": "integer", "primaryKey": false, "notNull": false},
+        "played_on": {"name": "played_on", "type": "date", "primaryKey": false, "notNull": false},
+        "result": {"name": "result", "type": "varchar(7)", "primaryKey": false, "notNull": true, "default": "'*'"},
+        "event": {"name": "event", "type": "varchar(250)", "primaryKey": false, "notNull": false},
+        "site": {"name": "site", "type": "varchar(250)", "primaryKey": false, "notNull": false},
+        "round": {"name": "round", "type": "varchar(50)", "primaryKey": false, "notNull": false},
+        "eco": {"name": "eco", "type": "varchar(8)", "primaryKey": false, "notNull": false},
+        "opening": {"name": "opening", "type": "varchar(200)", "primaryKey": false, "notNull": false},
+        "source_id": {"name": "source_id", "type": "integer", "primaryKey": false, "notNull": true},
+        "source_game_key": {"name": "source_game_key", "type": "varchar(160)", "primaryKey": false, "notNull": false},
+        "original_pgn": {"name": "original_pgn", "type": "text", "primaryKey": false, "notNull": true},
+        "structured_moves": {"name": "structured_moves", "type": "jsonb", "primaryKey": false, "notNull": true},
+        "created_at": {"name": "created_at", "type": "timestamp with time zone", "primaryKey": false, "notNull": true, "default": "now()"}
+      },
+      "indexes": {
+        "games_white_player_played_on_idx": {"name": "games_white_player_played_on_idx", "columns": [{"expression": "white_player_id", "isExpression": false, "asc": true, "nulls": "last"}, {"expression": "played_on", "isExpression": false, "asc": true, "nulls": "last"}], "isUnique": false, "concurrently": false, "method": "btree", "with": {}},
+        "games_black_player_played_on_idx": {"name": "games_black_player_played_on_idx", "columns": [{"expression": "black_player_id", "isExpression": false, "asc": true, "nulls": "last"}, {"expression": "played_on", "isExpression": false, "asc": true, "nulls": "last"}], "isUnique": false, "concurrently": false, "method": "btree", "with": {}}
+      },
+      "foreignKeys": {
+        "games_white_player_id_players_id_fk": {"name": "games_white_player_id_players_id_fk", "tableFrom": "games", "tableTo": "players", "columnsFrom": ["white_player_id"], "columnsTo": ["id"], "onDelete": "set null", "onUpdate": "no action"},
+        "games_black_player_id_players_id_fk": {"name": "games_black_player_id_players_id_fk", "tableFrom": "games", "tableTo": "players", "columnsFrom": ["black_player_id"], "columnsTo": ["id"], "onDelete": "set null", "onUpdate": "no action"},
+        "games_source_id_game_sources_id_fk": {"name": "games_source_id_game_sources_id_fk", "tableFrom": "games", "tableTo": "game_sources", "columnsFrom": ["source_id"], "columnsTo": ["id"], "onDelete": "no action", "onUpdate": "no action"}
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {"games_source_game_key_unique": {"name": "games_source_game_key_unique", "nullsNotDistinct": false, "columns": ["source_id", "source_game_key"]}},
+      "policies": {},
+      "checkConstraints": {
+        "games_white_name_not_blank": {"name": "games_white_name_not_blank", "value": "char_length(btrim(\"games\".\"white_name\")) > 0"},
+        "games_black_name_not_blank": {"name": "games_black_name_not_blank", "value": "char_length(btrim(\"games\".\"black_name\")) > 0"},
+        "games_white_rating_range": {"name": "games_white_rating_range", "value": "\"games\".\"white_rating\" is null or (\"games\".\"white_rating\" >= 1 and \"games\".\"white_rating\" <= 4000)"},
+        "games_black_rating_range": {"name": "games_black_rating_range", "value": "\"games\".\"black_rating\" is null or (\"games\".\"black_rating\" >= 1 and \"games\".\"black_rating\" <= 4000)"},
+        "games_result_format": {"name": "games_result_format", "value": "\"games\".\"result\" in ('1-0', '0-1', '1/2-1/2', '*')"}
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {"columns": {}, "schemas": {}, "tables": {}}
+}
