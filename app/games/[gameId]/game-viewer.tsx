@@ -97,8 +97,7 @@ export function GameViewer({ replay }: GameViewerProps) {
       showAnimations: true,
       animationDurationInMs: 180,
       boardStyle: {
-        borderRadius: "0.7rem",
-        boxShadow: "0 0.3rem 1.2rem rgb(23 32 24 / 12%)",
+        borderRadius: "0.65rem",
       },
     }),
     [fen, flipped],
