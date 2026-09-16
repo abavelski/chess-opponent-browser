@@ -1,0 +1,352 @@
+.viewer-shell {
+  width: min(100% - 2rem, 78rem);
+}
+
+.game-viewer-header {
+  margin: 1.25rem 0 1.5rem;
+}
+
+.game-viewer-header h1 {
+  max-width: 62rem;
+  font-size: clamp(1.7rem, 4vw, 2.7rem);
+}
+
+.game-result-heading {
+  display: inline-block;
+  margin: 0 0.25rem;
+  color: var(--muted);
+  font-size: 0.68em;
+  font-weight: 700;
+  vertical-align: 0.12em;
+}
+
+.viewer-metadata {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  margin-bottom: 1.25rem;
+  overflow: hidden;
+}
+
+.viewer-metadata > div {
+  display: grid;
+  min-width: 0;
+  gap: 0.28rem;
+  padding: 0.9rem 1rem;
+  border-right: 1px solid var(--border);
+}
+
+.viewer-metadata > div:last-child {
+  border-right: 0;
+}
+
+.viewer-metadata span,
+.viewer-metadata small {
+  color: var(--muted);
+}
+
+.viewer-metadata span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.viewer-metadata strong,
+.viewer-metadata small {
+  overflow-wrap: anywhere;
+}
+
+.viewer-metadata small {
+  font-size: 0.82rem;
+}
+
+.viewer-layout {
+  display: grid;
+  grid-template-columns: minmax(20rem, 34rem) minmax(20rem, 1fr);
+  align-items: start;
+  gap: 1.25rem;
+}
+
+.board-column {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.chessboard {
+  display: grid;
+  width: 100%;
+  aspect-ratio: 1;
+  grid-template-columns: repeat(8, 1fr);
+  overflow: hidden;
+  border: 1px solid #aab2a7;
+  border-radius: 0.7rem;
+  background: #dfe5d9;
+  box-shadow: 0 0.3rem 1.2rem rgb(23 32 24 / 8%);
+}
+
+.board-square {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  place-items: center;
+  user-select: none;
+}
+
+.light-square {
+  background: #eef1e8;
+}
+
+.dark-square {
+  background: #819270;
+}
+
+.board-piece {
+  font-family: "Segoe UI Symbol", "Noto Sans Symbols 2", "Arial Unicode MS", sans-serif;
+  font-size: clamp(1.85rem, 5.2vw, 3.9rem);
+  line-height: 1;
+  text-shadow: 0 1px 0 rgb(255 255 255 / 28%);
+}
+
+.square-coordinate {
+  position: absolute;
+  right: 0.18rem;
+  bottom: 0.08rem;
+  color: rgb(23 32 24 / 62%);
+  font-size: clamp(0.45rem, 1vw, 0.62rem);
+  font-weight: 700;
+}
+
+.viewer-controls {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.viewer-control-button,
+.text-button {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.viewer-control-button {
+  min-height: 3rem;
+  padding: 0.65rem 0.5rem;
+  border-radius: 0.6rem;
+}
+
+.viewer-control-button:hover:not(:disabled),
+.text-button:hover {
+  border-color: var(--focus);
+  background: var(--surface-muted);
+}
+
+.viewer-control-button:focus-visible,
+.text-button:focus-visible,
+.notation-move:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.viewer-control-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.viewer-position-row {
+  display: flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.current-position-label {
+  font-weight: 700;
+}
+
+.text-button {
+  min-height: 2.4rem;
+  padding: 0.4rem 0.65rem;
+  border-radius: 0.5rem;
+}
+
+.notation-panel {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.notation-heading-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1rem 0.85rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.notation-heading-row .eyebrow {
+  margin-bottom: 0.25rem;
+}
+
+.notation-heading-row .muted {
+  font-size: 0.8rem;
+  text-align: right;
+}
+
+.notation-scroll {
+  max-height: 36rem;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+.notation-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.42rem;
+}
+
+.notation-node {
+  display: contents;
+}
+
+.notation-move {
+  display: inline-flex;
+  min-height: 2.45rem;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.notation-move:hover {
+  border-color: var(--border);
+  background: var(--surface-muted);
+}
+
+.notation-move.is-current {
+  border-color: var(--accent);
+  background: #e7efe8;
+  color: var(--accent-strong);
+}
+
+.notation-number {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.move-comment {
+  flex: 1 0 100%;
+  margin: 0.1rem 0 0.3rem;
+  padding: 0.55rem 0.7rem;
+  border-left: 3px solid var(--focus);
+  background: var(--surface-muted);
+  color: #465047;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.variation-block {
+  flex: 1 0 100%;
+  margin: 0.15rem 0 0.35rem 0.9rem;
+  padding: 0.55rem 0.65rem;
+  border-left: 2px solid var(--border);
+  border-radius: 0 0.5rem 0.5rem 0;
+  background: #fafbf8;
+}
+
+.variation-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.variation-line {
+  gap: 0.3rem;
+}
+
+.viewer-unavailable {
+  margin-top: 1.25rem;
+}
+
+@media (max-width: 900px) {
+  .viewer-metadata {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .viewer-metadata > div:nth-child(2) {
+    border-right: 0;
+  }
+
+  .viewer-metadata > div:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .viewer-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .board-column {
+    width: min(100%, 38rem);
+    margin: 0 auto;
+  }
+
+  .notation-scroll {
+    max-height: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .viewer-shell {
+    width: min(100% - 1rem, 78rem);
+  }
+
+  .viewer-metadata {
+    grid-template-columns: 1fr;
+  }
+
+  .viewer-metadata > div,
+  .viewer-metadata > div:nth-child(2) {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .viewer-metadata > div:last-child {
+    border-bottom: 0;
+  }
+
+  .viewer-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .viewer-position-row,
+  .notation-heading-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .notation-heading-row .muted {
+    text-align: left;
+  }
+
+  .board-piece {
+    font-size: clamp(1.7rem, 10.5vw, 3.1rem);
+  }
+}

@@ -235,6 +235,15 @@ export default async function PlayerPage({ params, searchParams }: PlayerPagePro
 
   const playerPath = `/tournaments/${tournamentId}/players/${playerId}`;
   const active = hasActiveGameFilters(activeFilters);
+  const returnParams = new URLSearchParams({
+    color: activeFilters.color,
+    date: activeFilters.date,
+    rating: activeFilters.rating,
+    result: activeFilters.result,
+    source: activeFilters.source,
+    sort: activeFilters.sort,
+  });
+  const returnPath = `${playerPath}?${returnParams.toString()}`;
 
   return (
     <main className="app-shell">
@@ -298,32 +307,38 @@ export default async function PlayerPage({ params, searchParams }: PlayerPagePro
         ) : (
           <ul className="game-list">
             {gameItems.map((game) => (
-              <li className="panel game-card" key={game.id}>
-                <div className="game-card-topline">
-                  <span className="game-date">{game.date ?? "—"}</span>
-                  <span className="color-pill">{game.color}</span>
-                  <span className={`result-pill ${resultClass(game.result)}`}>{game.result}</span>
-                </div>
+              <li key={game.id}>
+                <Link
+                  className="panel game-card game-card-link"
+                  href={{ pathname: `/games/${game.id}`, query: { returnTo: returnPath } }}
+                >
+                  <div className="game-card-topline">
+                    <span className="game-date">{game.date ?? "—"}</span>
+                    <span className="color-pill">{game.color}</span>
+                    <span className={`result-pill ${resultClass(game.result)}`}>{game.result}</span>
+                  </div>
 
-                <div className="game-opponent">
-                  <strong>{game.opponentName}</strong>
-                  <span>{game.opponentRating ? `Rating ${game.opponentRating}` : "Rating —"}</span>
-                </div>
+                  <div className="game-opponent">
+                    <strong>{game.opponentName}</strong>
+                    <span>{game.opponentRating ? `Rating ${game.opponentRating}` : "Rating —"}</span>
+                    <span className="game-open-cue">Review game →</span>
+                  </div>
 
-                <dl className="game-metadata">
-                  <div>
-                    <dt>Event</dt>
-                    <dd>{game.event ?? "—"}</dd>
-                  </div>
-                  <div>
-                    <dt>Opening</dt>
-                    <dd>{openingLabel(game.eco, game.opening)}</dd>
-                  </div>
-                  <div>
-                    <dt>Source</dt>
-                    <dd>{game.sourceLabel}</dd>
-                  </div>
-                </dl>
+                  <dl className="game-metadata">
+                    <div>
+                      <dt>Event</dt>
+                      <dd>{game.event ?? "—"}</dd>
+                    </div>
+                    <div>
+                      <dt>Opening</dt>
+                      <dd>{openingLabel(game.eco, game.opening)}</dd>
+                    </div>
+                    <div>
+                      <dt>Source</dt>
+                      <dd>{game.sourceLabel}</dd>
+                    </div>
+                  </dl>
+                </Link>
               </li>
             ))}
           </ul>
