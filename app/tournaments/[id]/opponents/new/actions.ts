@@ -17,10 +17,6 @@ export type AddOpponentState = {
   values: OpponentFormValues;
 };
 
-export const initialAddOpponentState: AddOpponentState = {
-  values: { name: "", fideId: "", federation: "", rating: "" },
-};
-
 function parsePositiveId(value: FormDataEntryValue | null) {
   if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) {
     return null;
