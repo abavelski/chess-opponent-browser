@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 import "./opponents.css";
 import "./games.css";
+import "./viewer.css";
 
 export const metadata: Metadata = {
   title: "Chess Opponent Browser",
