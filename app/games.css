@@ -1,0 +1,135 @@
+.player-detail-header {
+  margin-bottom: 2rem;
+}
+
+.player-identity-section {
+  max-width: 46rem;
+}
+
+.games-section {
+  margin-top: 2.75rem;
+}
+
+.game-list {
+  display: grid;
+  gap: 0.85rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.game-card {
+  display: grid;
+  grid-template-columns: minmax(11rem, 0.9fr) minmax(12rem, 1.1fr) minmax(20rem, 2fr);
+  align-items: center;
+  gap: 1.25rem;
+  padding: 1rem 1.15rem;
+}
+
+.game-card-topline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.game-date {
+  min-width: 6.4rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.color-pill,
+.result-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.65rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.color-pill {
+  background: var(--surface-muted);
+  color: var(--muted);
+}
+
+.result-win {
+  background: #e5f3e9;
+  color: #205734;
+}
+
+.result-loss {
+  background: #f8e8e8;
+  color: #8b2929;
+}
+
+.result-draw,
+.result-unknown {
+  background: #eceee9;
+  color: #596159;
+}
+
+.game-opponent {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.game-opponent strong {
+  font-size: 1rem;
+}
+
+.game-opponent span {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.game-metadata {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(8rem, 0.8fr);
+  gap: 1rem;
+  margin: 0;
+}
+
+.game-metadata div {
+  min-width: 0;
+}
+
+.game-metadata dt {
+  margin-bottom: 0.25rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.game-metadata dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 860px) {
+  .game-card {
+    grid-template-columns: minmax(10rem, 0.8fr) minmax(12rem, 1fr);
+  }
+
+  .game-metadata {
+    grid-column: 1 / -1;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--border);
+  }
+}
+
+@media (max-width: 640px) {
+  .game-card {
+    grid-template-columns: 1fr;
+  }
+
+  .game-metadata {
+    grid-column: auto;
+    grid-template-columns: 1fr;
+  }
+}

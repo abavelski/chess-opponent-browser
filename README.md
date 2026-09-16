@@ -1,8 +1,6 @@
 # Chess Opponent Browser
 
-Chess Opponent Browser will become a web application for browsing chess opponents and their games.
-
-> Chess functionality has intentionally not been implemented yet.
+Chess Opponent Browser is a web application for tournament preparation and browsing chess opponents and their games.
 
 ## Stack
 
@@ -52,8 +50,8 @@ Never expose `DATABASE_URL` through a `NEXT_PUBLIC_` variable and never commit l
 The intended hosted environment mapping is:
 
 - Vercel Production -> Neon `main`
-- Vercel Preview -> Neon `preview`
-- Vercel Development -> Neon `preview`
+- Vercel Preview -> a Neon Preview branch
+- Vercel Development -> Neon Preview/development data
 
 ## Database migrations
 
@@ -65,9 +63,17 @@ npm run db:migrate
 npm run db:studio
 ```
 
-Generate and review migrations after changing the schema, then run migrations against the intended Neon branch. Production and Preview use separate Neon branches. This bootstrap does not run migrations automatically during Vercel builds, which avoids a Preview deployment mutating Production data.
+Generate and review migrations after changing the schema, then run migrations against the intended Neon branch. Production and Preview use separate Neon branches. Migrations do not run automatically during Vercel builds, which avoids a Preview deployment mutating Production data.
 
-For this first milestone, all Vercel Preview deployments share a dedicated Neon `preview` branch. Production uses the Neon `main` branch. Per-PR database branches can be introduced later if stronger isolation becomes necessary.
+## Fixture game data
+
+Task 003 includes an explicit, idempotent fixture loader for testing the opponent game browser before self-service PGN import exists.
+
+```bash
+FIXTURE_SEED_TARGET=preview npm run db:seed:task-003
+```
+
+`DATABASE_URL` must point at the intended migrated Preview database. The loader refuses to run without the explicit Preview target flag and must never be pointed at Production. See `docs/fixture-data.md` for the seeded tournament, players, games, safety rules, and validation steps.
 
 ## Tests
 
@@ -75,7 +81,7 @@ For this first milestone, all Vercel Preview deployments share a dedicated Neon 
 npm test
 ```
 
-The initial Vitest suite covers non-network environment logic and does not require database access.
+The Vitest suite covers non-network domain and validation logic and does not require database access.
 
 ## Build
 
@@ -99,12 +105,10 @@ The Vercel project is named `chess-opponent-browser` and uses the Next.js framew
 - feature branches and pull requests create Preview deployments;
 - `DATABASE_URL` is stored in Vercel, never in Git;
 - Production points to the Neon `main` branch;
-- Preview and Development point to the dedicated Neon `preview` branch.
+- Preview deployments use non-production Neon data.
 
-Connect the Vercel project to `abavelski/chess-opponent-browser` and configure the environment mapping above before relying on automatic deployments. No custom domain or custom deployment script is required for this milestone.
+No custom domain or custom deployment script is required for the current milestone.
 
 ## Git workflow
 
 Create feature branches from `main`, open pull requests back into `main`, and let GitHub Actions plus the Vercel Preview deployment validate changes before merging.
-
-The bootstrap branch for this milestone is `chore/bootstrap-app`.

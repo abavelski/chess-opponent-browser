@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import "./globals.css";
 import "./opponents.css";
+import "./games.css";
 
 export const metadata: Metadata = {
   title: "Chess Opponent Browser",
