@@ -5,7 +5,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Chess Opponent Browser",
-  description: "Application skeleton for Chess Opponent Browser",
+  description: "Private chess tournament preparation and opponent game browser",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
