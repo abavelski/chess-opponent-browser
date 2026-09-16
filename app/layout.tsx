@@ -5,6 +5,7 @@ import "./globals.css";
 import "./opponents.css";
 import "./games.css";
 import "./viewer.css";
+import "./imports.css";
 
 export const metadata: Metadata = {
   title: "Chess Opponent Browser",
