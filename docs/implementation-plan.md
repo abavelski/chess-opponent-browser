@@ -1,201 +1,262 @@
-# Chess Opponent Browser — Implementation Plan
+# Chess Opponent Browser — Revised Implementation Plan
+
+## Status
+
+Tasks 001–009 delivered the original tournament, game-browser, PGN-import, deduplication, and manual player-resolution foundation. This document now defines the product direction from Task 010 onward.
+
+The new direction is intentionally simpler. The application is not trying to become a general chess database or tournament-management system. Its job is to let an administrator prepare a small opponent library locally and share it with a coach through a simple web link.
 
 ## Product goal
 
-Chess Opponent Browser is a private web application for tournament preparation. Its first users are a serious junior chess player, the player's online coach, and an administrator/parent who collects and manages chess data.
+The real workflow starts with a large local PGN database, such as Danbase opened through En Croissant.
 
-The first product phase should remove the time the coach currently spends searching multiple chess databases and websites for games by a possible opponent. Before a tournament, an administrator prepares the relevant participants and game data. The coach should then be able to open a tournament, find an opponent, see all known games for that player, narrow the list to the most useful preparation set, and replay individual games in an ordinary web browser on desktop, laptop, or tablet.
+Before an upcoming tournament, the administrator knows the likely field. For each opponent, the administrator extracts that player's games from the large local database into a smaller PGN file. That smaller PGN is an **opponent pack**.
 
-The primary product metric is time from an opponent's name to useful games. The first phase is therefore a game library and opponent browser, not a chess engine, automated preparation engine, repertoire manager, scraping platform, or AI chess coach.
+The desired end-to-end workflow is:
+
+1. Keep the large chess database local.
+2. Run a small Node.js script for an opponent name, producing a PGN containing that opponent's games.
+3. Upload that PGN to Chess Opponent Browser.
+4. The website identifies the focal opponent for the pack, creates or reuses the canonical Player, adds that Player to the preparation tournament, and links the pack's games to that Player.
+5. Repeat for the tournament field, for example 50 opponents in a Swiss tournament.
+6. Share the website link with the coach.
+7. The coach opens the opponent list, clicks a player, filters that player's games, and replays individual games.
+
+The primary product metric remains **time from opponent name to useful games**, but the administrator workflow is now explicitly based on pre-filtered opponent packs rather than importing a general chess database into the website.
 
 ## Product principles
 
-### Optimize for fast preparation
+### 1. Opponent packs are the normal ingestion unit
 
-The coach workflow is the organizing product constraint. A representative flow is:
+A normal import is not an arbitrary PGN collection. It represents research for one focal opponent.
 
-1. Open `Copenhagen Open 2026`.
-2. Search for `Jan Kowalski`.
-3. Open the player.
-4. Select `Opponent as Black`.
-5. Select `Last 2 years`.
-6. Select `Opponent rating >= 2000`.
-7. Review the resulting games on an interactive board.
+The website should therefore ask or infer: **Which player is this pack about?** Once that focal player is known, importing the pack should automatically make the player browsable in the preparation tournament.
 
-Each implementation task should shorten or enable this workflow rather than maximize architectural completeness.
+The application should not require the administrator to import games, visit an unresolved-player queue, resolve the focal player, then separately add that Player to a tournament. That workflow is too indirect for the actual use case.
 
-### Games are global
+### 2. One preparation tournament is enough for the UI
 
-A chess game should logically exist once in the application. Tournaments do not own copies of games. Tournaments reference players; player pages query the global game library. The same player and the same game can therefore be useful for many tournaments.
+The existing multi-tournament schema can remain because removing it would create unnecessary migration work. The user-facing product, however, should optimize for one active preparation tournament/workspace.
 
-Conceptually:
+Do not invest in richer tournament management. New flows should default to the single preparation tournament and avoid asking the administrator to repeat tournament selection when it is unnecessary.
+
+### 3. Player creation should happen during pack import
+
+When an opponent pack is imported, the focal player should be reused when an unambiguous canonical Player already exists and otherwise created automatically.
+
+A successful opponent-pack import should also ensure that Player is in the preparation tournament roster. Adding an existing resolved Player to a tournament must also work directly from the roster UI.
+
+Manual unresolved-player resolution remains a fallback for ambiguous historical/general imports, not the expected path for opponent packs.
+
+### 4. Existing deduplication may remain, but it must not block pack linking
+
+Perfect duplicate handling is not a product priority. The local extraction workflow can already keep input reasonably clean.
+
+The current global Game fingerprint/deduplication system does not need to be removed. A game between A and B does not need two physical Game rows just because it appears in both A's pack and B's pack. It is sufficient—and preferable—for the same Game to be visible from both Player pages.
+
+The important requirement is this: **when an opponent pack hits an already-known duplicate Game, the import must still be allowed to attach the focal Player to the matching unresolved game side.** Deduplication must not cause the second player's research pack to disappear.
+
+### 5. Preserve the existing coach experience
+
+The already-delivered coach features remain useful and should not be redesigned unnecessarily:
+
+- opponent list/search;
+- player game list;
+- color/date/rating/result/source filters;
+- sorting;
+- game detail page;
+- interactive board and notation.
+
+Future work should primarily simplify getting data into those views.
+
+### 6. Keep the large source database local
+
+Danbase synchronization, En Croissant integration, scraping, and large server-side database imports are not required.
+
+The website receives only the smaller PGN packs that the administrator deliberately chooses to share. This keeps the deployed application small and the workflow understandable.
+
+## Existing foundation
+
+The following capabilities are already implemented and should be reused rather than replaced:
+
+1. Tournament and tournament-participant schema/UI.
+2. Canonical global Players.
+3. Global Games with structured moves and original PGN.
+4. Opponent game browsing, filtering, sorting, and replay.
+5. PGN parsing and import preview.
+6. Persistent imports and provenance.
+7. Duplicate fingerprints and import history.
+8. Player aliases and manual unresolved-player resolution.
+
+The main gap is not storage or browsing. It is that import, canonical Player creation, and tournament participation are still separate workflows.
+
+## Target workflow
+
+### Administrator
+
+For each expected opponent:
 
 ```text
-imports
-   ↓
-game library
-   ↓
-players
-   ↓
-tournaments
+large local Danbase PGN
+        ↓
+local extraction script --name "Opponent Name"
+        ↓
+opponent-name.pgn
+        ↓
+website import
+        ↓
+identify focal player
+        ↓
+create/reuse Player + add to preparation roster
+        ↓
+link imported/new-or-duplicate games to that Player
 ```
 
-### Player identity is conservative
+After importing all packs, the preparation roster is the complete coach-facing opponent list.
 
-FIDE ID is the preferred canonical identifier when it is known, but imported PGNs may contain only names. The design must support a canonical player name, normalized names, FIDE ID, aliases, unresolved game-side identities, and later manual resolution.
+### Coach
 
-Automatic matching must prefer false negatives over false positives. If identity is ambiguous, leave the game side unresolved rather than attaching it to the wrong player. Fuzzy matching and external FIDE lookup are intentionally deferred.
+```text
+shared link
+   ↓
+opponent list
+   ↓
+player
+   ↓
+filtered games
+   ↓
+game board
+```
 
-### Preserve provenance and original data
+No import history, unresolved-player tooling, tournament creation, or other administrator concepts need to be prominent in the coach path.
 
-Games may eventually come from Danbase, TWIC, federation archives, ChessArbiter, Chess-Results, tournament sites, manual PGNs, and automated importers. The data model must preserve source/import provenance and the original PGN payload or equivalent raw information. Do not discard tags or annotations simply because the initial UI does not display them.
+## Ordered incremental tasks
 
-A global game may later be observed from more than one source. The model should permit multiple provenance records to refer to one logical game rather than forcing tournament-specific or source-specific game copies.
+The tasks below are intentionally small and build on the current production application.
 
-### Parse on ingestion, query structured data while browsing
+### Task 010 — Reuse existing Players when adding tournament opponents
 
-PGN parsing belongs on an ingestion path. Normal tournament, player, filter, and game-viewer requests should use indexed database records and a stored structured move representation. The application should not repeatedly parse the original PGN every time a player or game page is rendered.
+Fix the current roster gap first.
 
-### Keep the first phase as one deployable application
+The Add opponent flow should search existing canonical Players by canonical name, remembered alias, and FIDE ID. The administrator should be able to select an existing Player and add that Player to the tournament without creating a duplicate Player record.
 
-Do not introduce microservices, queues, separate scraping services, or other distributed infrastructure for the first phase. Extend the existing Next.js application, PostgreSQL database, Drizzle schema/migrations, CI, and Vercel deployment model unless a concrete product requirement proves that insufficient.
+Requirements:
 
-### Deliver vertical slices
+- server-side search over canonical player name, alias text, and FIDE ID;
+- clearly show canonical name and FIDE ID when available;
+- exclude or label Players already in the tournament;
+- selecting an existing Player creates only the `tournament_participants` row;
+- keep the existing create-new-Player path for names that do not exist;
+- no schema migration should be required.
 
-Every task below should leave the application working, deployable, and human-testable. A task may include database schema, migrations, server behavior, UI, tests, and responsive behavior when those are required to deliver one coherent user capability.
+Acceptance example: Production Player `alexeibavelski` can be found by name and added to the current tournament even though the Player has no FIDE ID.
 
-Avoid horizontal phases such as “build all tables,” “build all APIs,” then “build all UI.”
+### Task 011 — Import an opponent pack directly into the preparation roster
 
-## Current architecture
+Extend the existing PGN import flow with the concept of one focal player.
 
-The repository is an intentionally minimal full-stack skeleton with no chess product functionality yet.
+The preview should inspect the parsed games and find player names that occur throughout the pack. If exactly one imported name appears in every parsed game, preselect it as the focal player. If detection is not unique, let the administrator choose one of the player names found in the PGN.
 
-- Next.js `16.3.5` using the App Router.
-- React `19.3.0` and TypeScript.
-- Tailwind CSS `4.3.3` via PostCSS.
-- PostgreSQL hosted by Neon, accessed with `@neondatabase/serverless` and Drizzle ORM.
-- Drizzle Kit for generated SQL migrations.
-- Vitest for tests and ESLint for linting.
-- Node.js 24 in CI.
-- A single root page that reports that the application skeleton is running and displays the current environment label.
-- `GET /api/health`, which executes `SELECT 1` through Drizzle and returns HTTP 503 if the database is unavailable.
-- A bootstrap `app_metadata` table and one committed Drizzle migration. No tournament, player, game, source, or import schema exists yet.
-- No chess/PGN parsing or board-viewer dependency is installed yet.
-- No authentication or application-level authorization is implemented in the repository.
-- GitHub Actions validates pull requests and pushes to `main` with `npm ci`, lint, typecheck, Vitest, and a production Next.js build.
-- The repository documentation describes standard Vercel Git integration: `main` deploys to Production; feature branches/PRs deploy to Preview.
-- Production is intended to use the Neon `main` branch. Preview and Development use a shared Neon `preview` branch.
-- Database migrations are intentionally not run automatically during Vercel builds. Workers making schema changes must apply migrations to the correct Neon branch before validating database-backed Preview functionality.
+On confirmation:
 
-The existing infrastructure is sufficient for the planned first phase and should not be redesigned as part of product work.
+1. Resolve the focal imported identity by exact FIDE ID when safely available, then exact remembered alias/canonical name.
+2. If no canonical Player exists, create one using the selected imported name; allow the administrator to edit the canonical display name before confirmation.
+3. Ensure the Player is a participant in the preparation tournament; repeated imports must be idempotent here.
+4. Link every matching White/Black side in newly inserted games to that Player.
+5. When the Game is an existing duplicate, also link the matching side if that side is currently unresolved.
+6. Never overwrite a side already linked to a different canonical Player. Report that as a conflict instead.
+7. Leave the non-focal opponent side unresolved unless normal conservative matching can resolve it safely.
 
-## Target first-phase architecture
+The import result should emphasize the useful outcome:
 
-The first-phase target remains one Next.js application backed by one PostgreSQL database.
+- focal opponent created or reused;
+- opponent added/already present in preparation roster;
+- number of games now visible for that opponent;
+- duplicate games reused;
+- conflicts/errors, if any.
 
-The application should use server-side code for database access and mutations, with React UI for the coach/admin workflows. Exact choices among server actions, route handlers, server components, and client components may evolve task by task; the durable constraint is that database credentials remain server-only and the browser receives only the data it needs.
+The unresolved-player queue remains available for exceptional cases but should no longer be needed for a normal opponent-pack import.
 
-The database should hold global domain records for tournaments, players, tournament participation, games, sources, and imports. Queryable game metadata should be stored in columns suitable for filtering and indexing. The original PGN and a structured representation of moves/comments/variations should be persisted so the game viewer does not need to reparse PGN on ordinary reads.
+### Task 012 — Add the local Danbase opponent-extraction script
 
-The initial application can use a single shared database for the private user group. Sophisticated role-based authorization is not required to validate the core workflow, but the absence of application-level authentication must be reviewed before broader or public-facing use. Do not expand the early implementation tasks into a general identity platform.
+Add a Node.js CLI script to the repository for local use. It should read a large PGN file and write a smaller PGN containing only games where the requested player appears as White or Black.
 
-## Domain model
+Example intended usage:
 
-The descriptions below are conceptual. Individual task workers should choose a clean Drizzle/PostgreSQL representation without treating these notes as a frozen final SQL schema.
+```bash
+npm run extract:opponent -- \
+  --input /path/to/danbase.pgn \
+  --name "Nielsen,Jens Ove Fries" \
+  --output ./packs/jens-ove-fries.pgn
+```
 
-### Tournament
+Requirements:
 
-Represents a preparation context such as `Copenhagen Open 2026`. A tournament has a name and a set of potential opponents/participants. A tournament does not own games.
+- Node.js only; no separate service;
+- process games incrementally/streamingly so a large PGN does not need to be loaded fully into memory;
+- preserve each selected game's PGN text rather than rewriting moves/tags;
+- compare the `White` and `Black` tags using the same basic Unicode/whitespace/case normalization used by the web importer;
+- support repeatable optional aliases so local source spelling variants can be included deliberately;
+- print a useful summary: games scanned, games matched, output path;
+- fail clearly when the input file is missing, output cannot be written, or no player name is supplied;
+- add a short usage document.
 
-### Player
+No automatic FIDE lookup, fuzzy matching, En Croissant plugin, or Danbase-specific network integration is needed.
 
-Represents a canonical chess person in the global library. Important identity attributes include a canonical name and optional FIDE ID. Names from imported PGNs may be normalized for matching, but name equality alone must not force unsafe merges.
+### Task 013 — Simplify the application around one preparation tournament
 
-### Tournament participant
+After opponent-pack import works, reduce navigation friction without changing the underlying multi-tournament schema.
 
-Associates a global Player with a Tournament. It can preserve tournament-specific snapshot information such as rating and federation. This allows the same Player to appear in many tournaments without duplicating the Player record.
+Requirements:
 
-### Game
+- make the single preparation tournament/opponent roster the primary landing experience;
+- when there is exactly one tournament, go directly to or prominently render its opponent list rather than making the coach choose a tournament first;
+- keep tournament creation/management secondary/admin-only in presentation;
+- make `Import opponent pack` the primary administrator action from the preparation roster;
+- keep Import history and Unresolved players available as secondary troubleshooting tools;
+- preserve stable shareable URLs to opponent and game pages;
+- no destructive migration to remove tournament tables.
 
-Represents one logical chess game in the global library. Important structured metadata includes the two sides, date, result, event, ratings, ECO/opening when available, and a structured move tree suitable for the game viewer. Game-side links to canonical Players may be unresolved when identity is not known safely.
+If multiple old/test tournaments exist, preserve access to them rather than deleting data. The simplification is a UI/product default, not a destructive schema rewrite.
 
-A game should not be duplicated merely because it is relevant to more than one tournament or observed in more than one import.
+## Milestone — Coach-shareable tournament pack
 
-### Source
+After Task 013, the target workflow is complete:
 
-Represents where data came from, for example `Manual`, `TWIC`, or `Danbase`. Initial source handling may be simple, but games/imports must retain enough provenance to support source filtering and later source-specific importers.
+- administrator extracts one PGN pack per opponent locally;
+- administrator uploads each pack;
+- focal Player is created/reused automatically;
+- focal Player is added to the preparation roster automatically;
+- the opponent's imported games are immediately browsable;
+- importing the same A-vs-B game through both A's and B's packs can make that one logical Game visible under both Players;
+- administrator repeats this for the tournament field;
+- coach receives one link, opens the opponent list, filters games, and replays them.
 
-### Import
+This is the product milestone to optimize for. Work after it should be driven by real preparation/coach feedback rather than by database completeness.
 
-Represents one administrator ingestion attempt, including source, time, filename or equivalent input identity, summary counts, and per-game success/duplicate/error outcomes. Import/provenance records should retain the original PGN information and can point to an existing Game when a duplicate is detected.
+## Implementation constraints
 
-### Player alias / unresolved identity
+### Prefer incremental changes over redesign
 
-Later first-phase work introduces explicit resolution of imported names that could not be matched safely. A remembered alias may help future exact matching, but ambiguous aliases must not become automatic merge rules.
+Keep the current schema, importer, deduplication, aliases, tournament model, game browser, and board viewer unless a concrete task cannot be completed safely without changing them.
 
-## Delivery strategy
+Do not rewrite Tasks 001–009 merely to fit the new mental model.
 
-The order below is intentionally optimized for learning.
+### Database migrations
 
-Tasks 001–005 create the tournament-to-opponent-to-game-review workflow using developer/fixture-loaded game data. This lets the coach test the product's most important interaction before the project invests in a complete self-service ingestion flow.
+Task 010 should require no migration. Task 011 should first attempt to implement pack behavior with the existing Player, alias, tournament-participant, Game, and Import tables. Add schema only if a concrete missing invariant requires it.
 
-Tasks 006–008 then make PGN ingestion self-service for the administrator. The parsing UI is separated from persistence so parser quality and error presentation can be validated independently. Persistence is separated from duplicate handling so each pull request remains a coherent, testable vertical slice.
+Task 013 explicitly should not remove the existing multi-tournament schema.
 
-Task 009 improves real-world data quality by letting an administrator resolve identities that conservative automatic matching intentionally leaves unresolved.
+### Matching safety
 
-All tasks assume their stated prerequisite tasks have been merged. Each task should be implemented on its own feature branch and pull request.
+The focal player is explicitly chosen by the administrator during an opponent-pack import, so linking that selected imported identity is deliberate rather than fuzzy inference.
 
-## Ordered task list
-
-1. [Task 001 — Create and view tournaments](tasks/task-001-create-and-view-tournaments.md) — An administrator can create a tournament through the deployed UI and reopen it later.
-2. [Task 002 — Manage tournament opponents](tasks/task-002-manage-tournament-opponents.md) — An administrator can add potential opponents to a tournament, and the coach can search and open them.
-3. [Task 003 — Browse seeded opponent games](tasks/task-003-browse-seeded-opponent-games.md) — The coach can open an opponent and scan globally stored games loaded through deterministic developer/fixture data.
-4. [Task 004 — Filter and sort opponent games](tasks/task-004-filter-and-sort-opponent-games.md) — The coach can narrow an opponent's games by color, date, opponent rating, result, and source, then sort the result set.
-5. [Task 005 — Replay games on a chessboard](tasks/task-005-replay-games-on-chessboard.md) — The coach can open a game, step through moves, click notation, and inspect comments/variations on desktop and tablet.
-6. [Task 006 — Preview PGN imports](tasks/task-006-preview-pgn-imports.md) — An administrator can upload a PGN file and see a recoverable parse preview and errors without writing to the database.
-7. [Task 007 — Persist PGN imports](tasks/task-007-persist-pgn-imports.md) — An administrator can confirm a parsed import, persist games/provenance, and make safely matched games immediately visible to the coach.
-8. [Task 008 — Deduplicate and track imports](tasks/task-008-deduplicate-and-track-imports.md) — Re-importing known games no longer creates obvious duplicates, and the administrator receives durable import summaries/history.
-9. [Task 009 — Resolve player identities](tasks/task-009-resolve-player-identities.md) — An administrator can manually attach unresolved imported names to the correct player and optionally remember safe aliases.
-
-This list is authoritative. If future work changes task order or scope, update this document and the affected task documents together.
-
-## Milestones
-
-### First Coach-Usable MVP — completed by Task 005
-
-After Task 005, a developer/administrator may still need to load game data manually or through fixtures, but the coach can perform genuine preparation in a deployed application:
-
-- open a tournament;
-- search/select a potential opponent;
-- see that player's known global games;
-- filter by color, date, opponent rating, result, and source;
-- sort the remaining games;
-- open and replay a game on an interactive board with notation, comments, and variations.
-
-This milestone should be tested with the coach before expanding the import system further.
-
-### First Self-Service Import MVP — completed by Task 008
-
-After Task 008, an administrator can add new PGN data without editing code or database records:
-
-- upload a PGN file;
-- receive a parse/import result;
-- persist successfully parsed games with original PGN/provenance;
-- have conservatively matched games appear for the relevant players;
-- skip/report obvious duplicates rather than creating extra Game records;
-- inspect import history and counts for parsed, imported, duplicate, and failed games.
-
-Task 009 improves the unresolved-identity workflow but is not required to reach the first self-service import milestone.
-
-## Cross-task implementation constraints
-
-### Migrations
-
-When a task changes the Drizzle schema, generate and commit the migration. Apply it to the Neon `preview` branch before testing the Vercel Preview deployment. Do not add automatic production migration execution to Vercel builds. Production migration timing should remain an explicit deployment step around merge/release.
+Do not silently use substring, phonetic, or probabilistic name matching. Do not overwrite an existing conflicting canonical game-side link.
 
 ### Validation
 
-Unless a task explicitly has no relevant application changes, implementation pull requests should run the repository's current validation commands:
+Each implementation change should keep the existing validation gates green:
 
 ```bash
 npm run lint
@@ -204,41 +265,35 @@ npm test
 npm run build
 ```
 
-Database-backed tasks should also confirm `GET /api/health` against the migrated Preview environment.
+Database-backed changes should also validate the relevant import/roster behavior in Preview before Production release.
 
-### Backward-compatible slices
+## Deprioritized or deferred work
 
-Each pull request should keep previously delivered user flows working. A later task may extend a schema or page, but it should not intentionally break an earlier milestone while waiting for another task.
+The following should not drive near-term development:
 
-### Responsive behavior
-
-Coach-facing browsing and game review must remain usable on desktop, laptop, and iPad/tablet-sized screens. Admin-only import forms should also remain functional on tablet, but desktop-first density is acceptable where appropriate.
-
-## Deferred functionality
-
-The following are intentionally outside the first implementation phase unless a later planning revision explicitly promotes them:
-
-- automatic TWIC updates;
-- Danbase synchronization;
-- Swedish federation importer;
-- Polish ChessArbiter importer;
-- Chess-Results integration;
-- automated tournament participant imports;
-- FIDE API lookup;
-- fuzzy or advanced automated player-identity resolution;
-- opening statistics and opening-tree generation;
-- position search;
-- opponent opening reports;
+- richer multi-tournament management;
+- perfect global duplicate detection;
+- automatic bulk tournament participant imports;
+- server-side Danbase synchronization;
+- direct En Croissant integration/plugin development;
+- TWIC/federation/Chess-Results scrapers;
+- fuzzy player matching;
+- external FIDE API lookup;
+- automatic resolution of every non-focal player in imported games;
+- opening reports/statistics;
+- engine analysis;
 - Lichess Study synchronization;
-- the player's repertoire import;
-- position-based repertoire intersection;
-- automatic coach preparation Studies;
-- automatic Swiss-tournament preparation;
-- offline/iPad tournament packs;
-- Stockfish analysis/evaluations;
-- LLM summaries;
-- representative-game ranking;
-- scraping infrastructure or scheduled national-source crawlers;
-- general-purpose user/role management beyond what is necessary to keep the private application appropriately protected.
+- repertoire management;
+- AI summaries;
+- general-purpose accounts/roles beyond what is needed to protect the private shared application.
 
-These ideas should not inflate the early task scopes. Validate the basic opponent-browsing workflow with real users first.
+## Authoritative next order
+
+Tasks 001–009 are complete historical foundation. The next implementation order is:
+
+1. Task 010 — reuse existing Players in tournament roster;
+2. Task 011 — opponent-pack import with automatic roster/player linking;
+3. Task 012 — local Danbase opponent extraction script;
+4. Task 013 — simplify the coach/admin UI around one preparation tournament.
+
+If real use shows that Task 012 is needed earlier for testing, it can be implemented before Task 011 without architectural impact. Otherwise this order keeps the smallest production bug fix first and then delivers the core automated opponent-pack workflow.
