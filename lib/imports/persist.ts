@@ -50,10 +50,42 @@ export type PersistedImportError = {
 
 export type ImportStatus = "processing" | "completed" | "completed_with_errors" | "failed";
 
+export type FocalOpponentInput = {
+  sourceName: string;
+  sourceFideId: string | null;
+  canonicalName: string;
+  tournamentId: number;
+};
+
+export type FocalOpponentConflict = {
+  index: number;
+  side: "White" | "Black";
+  message: string;
+};
+
+export type FocalOpponentResult = {
+  playerId: number;
+  playerName: string;
+  playerCreated: boolean;
+  tournamentId: number;
+  rosterAdded: boolean;
+  visibleGameCount: number;
+  conflictCount: number;
+  conflicts: FocalOpponentConflict[];
+};
+
 export type ImportPersistenceRepository = {
   ensureSource(sourceLabel: string): Promise<{ id: number; label: string }>;
   listCanonicalPlayers(): Promise<CanonicalPlayerIdentity[]>;
   listPlayerAliases?(): Promise<PlayerAliasIdentity[]>;
+  createCanonicalPlayer(input: { name: string; fideId: string | null }): Promise<CanonicalPlayerIdentity>;
+  rememberPlayerAlias?(input: {
+    playerId: number;
+    aliasText: string;
+    normalizedKey: string;
+  }): Promise<void>;
+  ensureTournamentParticipant(tournamentId: number, playerId: number): Promise<{ added: boolean }>;
+  countGamesForPlayer(playerId: number): Promise<number>;
   createImport(input: {
     sourceId: number;
     filename: string;
@@ -84,6 +116,7 @@ export type PersistImportResult = {
   unresolvedSideCount: number;
   persistenceErrors: Array<{ index: number; message: string }>;
   affectedPlayers: AffectedPlayerLink[];
+  focalOpponent: FocalOpponentResult | null;
 };
 
 type IdentityIndex = {
@@ -186,13 +219,66 @@ export async function persistParsedImport(
     filename: string;
     sourceLabel: string;
     preview: PgnPreview;
+    focalOpponent?: FocalOpponentInput;
   },
   repository: ImportPersistenceRepository,
 ): Promise<PersistImportResult> {
   const source = await repository.ensureSource(input.sourceLabel);
   const players = await repository.listCanonicalPlayers();
   const aliases = repository.listPlayerAliases ? await repository.listPlayerAliases() : [];
-  const identities = buildIdentityIndex(players, aliases);
+  let identities = buildIdentityIndex(players, aliases);
+
+  let focalPlayer: CanonicalPlayerIdentity | null = null;
+  let focalPlayerCreated = false;
+  let rosterAdded = false;
+  let focalSourceKey = "";
+
+  if (input.focalOpponent) {
+    focalSourceKey = normalizeImportedPlayerName(input.focalOpponent.sourceName);
+    const existingResolution = resolveImportedSide(
+      {
+        name: input.focalOpponent.sourceName,
+        fideId: input.focalOpponent.sourceFideId,
+      },
+      identities,
+    );
+
+    if (existingResolution.playerId !== null) {
+      focalPlayer = identities.byId.get(existingResolution.playerId) ?? null;
+    }
+
+    if (!focalPlayer) {
+      focalPlayer = await repository.createCanonicalPlayer({
+        name: input.focalOpponent.canonicalName,
+        fideId: usableFideId(input.focalOpponent.sourceFideId),
+      });
+      focalPlayerCreated = true;
+      players.push(focalPlayer);
+      identities = buildIdentityIndex(players, aliases);
+
+      const canonicalKey = normalizeImportedPlayerName(focalPlayer.name);
+      if (
+        repository.rememberPlayerAlias &&
+        focalSourceKey &&
+        focalSourceKey !== canonicalKey &&
+        input.focalOpponent.sourceName.length <= 200 &&
+        focalSourceKey.length <= 200
+      ) {
+        await repository.rememberPlayerAlias({
+          playerId: focalPlayer.id,
+          aliasText: input.focalOpponent.sourceName.trim(),
+          normalizedKey: focalSourceKey,
+        });
+      }
+    }
+
+    const participant = await repository.ensureTournamentParticipant(
+      input.focalOpponent.tournamentId,
+      focalPlayer.id,
+    );
+    rosterAdded = participant.added;
+  }
+
   const importId = await repository.createImport({
     sourceId: source.id,
     filename: input.filename,
@@ -217,16 +303,39 @@ export async function persistParsedImport(
     let unresolvedSideCount = 0;
     const persistenceErrors: Array<{ index: number; message: string }> = [];
     const affectedPlayerIds = new Set<number>();
+    const focalConflicts: FocalOpponentConflict[] = [];
 
     for (const game of input.preview.games) {
-      const white = resolveImportedSide(
+      const normalWhite = resolveImportedSide(
         { name: game.white, fideId: game.whiteFideId },
         identities,
       );
-      const black = resolveImportedSide(
+      const normalBlack = resolveImportedSide(
         { name: game.black, fideId: game.blackFideId },
         identities,
       );
+
+      const whiteMatchesFocal = Boolean(
+        focalPlayer && normalizeImportedPlayerName(game.white) === focalSourceKey,
+      );
+      const blackMatchesFocal = Boolean(
+        focalPlayer && normalizeImportedPlayerName(game.black) === focalSourceKey,
+      );
+      const whiteFideConflict = Boolean(
+        focalPlayer && whiteMatchesFocal && targetContradictsSourceFide(game.whiteFideId, focalPlayer),
+      );
+      const blackFideConflict = Boolean(
+        focalPlayer && blackMatchesFocal && targetContradictsSourceFide(game.blackFideId, focalPlayer),
+      );
+
+      const requestedWhitePlayerId =
+        focalPlayer && whiteMatchesFocal && !whiteFideConflict
+          ? focalPlayer.id
+          : normalWhite.playerId;
+      const requestedBlackPlayerId =
+        focalPlayer && blackMatchesFocal && !blackFideConflict
+          ? focalPlayer.id
+          : normalBlack.playerId;
 
       try {
         const saved = await repository.saveGameUnit({
@@ -234,17 +343,49 @@ export async function persistParsedImport(
           sourceId: source.id,
           game,
           fingerprint: createGameFingerprint(game),
-          whitePlayerId: white.playerId,
-          blackPlayerId: black.playerId,
+          whitePlayerId: requestedWhitePlayerId,
+          blackPlayerId: requestedBlackPlayerId,
         });
 
         if (saved.outcome === "duplicate") duplicateCount += 1;
         else importedCount += 1;
 
-        if (white.playerId === null) unresolvedSideCount += 1;
-        if (black.playerId === null) unresolvedSideCount += 1;
+        if (saved.whitePlayerId === null) unresolvedSideCount += 1;
+        if (saved.blackPlayerId === null) unresolvedSideCount += 1;
         if (saved.whitePlayerId !== null) affectedPlayerIds.add(saved.whitePlayerId);
         if (saved.blackPlayerId !== null) affectedPlayerIds.add(saved.blackPlayerId);
+
+        if (focalPlayer && whiteMatchesFocal) {
+          if (whiteFideConflict) {
+            focalConflicts.push({
+              index: game.index,
+              side: "White",
+              message: "The imported White FIDE ID conflicts with the focal canonical Player.",
+            });
+          } else if (saved.whitePlayerId !== focalPlayer.id) {
+            focalConflicts.push({
+              index: game.index,
+              side: "White",
+              message: "The existing Game is already linked to a different White Player.",
+            });
+          }
+        }
+
+        if (focalPlayer && blackMatchesFocal) {
+          if (blackFideConflict) {
+            focalConflicts.push({
+              index: game.index,
+              side: "Black",
+              message: "The imported Black FIDE ID conflicts with the focal canonical Player.",
+            });
+          } else if (saved.blackPlayerId !== focalPlayer.id) {
+            focalConflicts.push({
+              index: game.index,
+              side: "Black",
+              message: "The existing Game is already linked to a different Black Player.",
+            });
+          }
+        }
       } catch {
         persistenceErrors.push({
           index: game.index,
@@ -279,6 +420,18 @@ export async function persistParsedImport(
     });
 
     const affectedPlayers = await repository.listAffectedPlayerLinks([...affectedPlayerIds]);
+    const focalOpponent = focalPlayer && input.focalOpponent
+      ? {
+          playerId: focalPlayer.id,
+          playerName: focalPlayer.name,
+          playerCreated: focalPlayerCreated,
+          tournamentId: input.focalOpponent.tournamentId,
+          rosterAdded,
+          visibleGameCount: await repository.countGamesForPlayer(focalPlayer.id),
+          conflictCount: focalConflicts.length,
+          conflicts: focalConflicts,
+        }
+      : null;
 
     return {
       importId,
@@ -290,6 +443,7 @@ export async function persistParsedImport(
       unresolvedSideCount,
       persistenceErrors,
       affectedPlayers,
+      focalOpponent,
     };
   } catch (error) {
     try {
