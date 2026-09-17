@@ -57,6 +57,14 @@ describe("player identity resolution", () => {
     });
   });
 
+  it("does not let a canonical-name match contradict non-empty FIDE evidence", () => {
+    const index = buildIdentityIndex(players);
+    expect(resolveImportedSide({ name: "Jan Kowalski", fideId: "999" }, index)).toEqual({
+      playerId: null,
+      method: null,
+    });
+  });
+
   it("does not auto-resolve an ambiguous alias", () => {
     const index = buildIdentityIndex(players, [
       { playerId: 1, normalizedKey: "j. kowalski" },
