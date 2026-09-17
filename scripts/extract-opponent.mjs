@@ -47,15 +47,15 @@ function gameText(lines) {
 }
 
 export function gameMatchesPlayer(tags, normalizedNames) {
-  const white = normalizePlayerName(tags.White);
-  const black = normalizePlayerName(tags.Black);
+  const white = normalizePlayerName(tags.white);
+  const black = normalizePlayerName(tags.black);
   return normalizedNames.has(white) || normalizedNames.has(black);
 }
 
 function parseTagLine(line) {
   const match = line.match(tagLinePattern);
   if (!match) return null;
-  return { name: match[1], value: unescapeTag(match[2]) };
+  return { name: match[1].toLowerCase(), value: unescapeTag(match[2]) };
 }
 
 async function openOutput(outputPath) {
