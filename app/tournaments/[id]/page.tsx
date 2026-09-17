@@ -38,6 +38,7 @@ export default async function TournamentPage({ params, searchParams }: Tournamen
 
   const query = normalizeRosterSearch(rawQuery);
   let tournament: TournamentDetail | undefined;
+  let tournamentCount = 0;
   let roster: Array<{
     playerId: number;
     name: string;
@@ -53,6 +54,9 @@ export default async function TournamentPage({ params, searchParams }: Tournamen
       .from(tournaments)
       .where(eq(tournaments.id, tournamentId))
       .limit(1);
+
+    const tournamentIds = await db.select({ id: tournaments.id }).from(tournaments);
+    tournamentCount = tournamentIds.length;
 
     if (tournament) {
       const searchCondition = query
@@ -87,11 +91,8 @@ export default async function TournamentPage({ params, searchParams }: Tournamen
 
     return (
       <main className="app-shell narrow-shell">
-        <Link className="back-link" href="/">
-          ← Tournaments
-        </Link>
         <section className="panel empty-state" role="alert">
-          <h1>Tournament could not be loaded</h1>
+          <h1>Preparation workspace could not be loaded</h1>
           <p>Try refreshing the page. If the problem continues, check the database health.</p>
         </section>
       </main>
@@ -104,28 +105,38 @@ export default async function TournamentPage({ params, searchParams }: Tournamen
 
   return (
     <main className="app-shell">
-      <Link className="back-link" href="/">
-        ← Tournaments
-      </Link>
+      {tournamentCount > 1 ? (
+        <Link className="back-link" href="/">
+          ← Preparation workspaces
+        </Link>
+      ) : null}
 
-      <header className="detail-header">
-        <p className="eyebrow">Tournament</p>
-        <h1>{tournament.name}</h1>
+      <header className="page-header">
+        <div>
+          <p className="eyebrow">Preparation workspace</p>
+          <h1>{tournament.name}</h1>
+          <p className="muted page-intro">
+            Choose an opponent to browse their games, or import another opponent pack for this field.
+          </p>
+        </div>
+        <div className="page-header-actions">
+          <Link className="button" href={`/imports/new?tournamentId=${tournament.id}`}>
+            Import opponent pack
+          </Link>
+          <Link className="button secondary-button" href={`/tournaments/${tournament.id}/opponents/new`}>
+            Add opponent manually
+          </Link>
+        </div>
       </header>
 
       <section aria-labelledby="opponents-heading" className="section-stack">
-        <div className="section-heading section-heading-with-action">
-          <div className="section-heading">
-            <h2 id="opponents-heading">Potential opponents</h2>
-            <span className="count-badge">{roster.length}</span>
-          </div>
-          <Link className="button" href={`/tournaments/${tournament.id}/opponents/new`}>
-            Add opponent
-          </Link>
+        <div className="section-heading">
+          <h2 id="opponents-heading">Opponents</h2>
+          <span className="count-badge">{roster.length}</span>
         </div>
 
         <form action={`/tournaments/${tournament.id}`} className="roster-search" method="get">
-          <label htmlFor="roster-search">Search roster</label>
+          <label htmlFor="roster-search">Search opponents</label>
           <div className="search-row">
             <input
               defaultValue={query}
@@ -147,20 +158,25 @@ export default async function TournamentPage({ params, searchParams }: Tournamen
 
         {roster.length === 0 ? (
           <div className="panel empty-state">
-            <h3>{query ? "No matching opponents" : "No opponents added yet"}</h3>
+            <h3>{query ? "No matching opponents" : "No opponents imported yet"}</h3>
             <p>
               {query
                 ? `No roster entries match “${query}”.`
-                : "Add potential opponents so the coach can find them quickly before a round."}
+                : "Import a pre-filtered PGN pack and the focal opponent will be added here automatically."}
             </p>
             {query ? (
               <Link className="text-link" href={`/tournaments/${tournament.id}`}>
                 Show full roster →
               </Link>
             ) : (
-              <Link className="text-link" href={`/tournaments/${tournament.id}/opponents/new`}>
-                Add first opponent →
-              </Link>
+              <div className="form-actions">
+                <Link className="button" href={`/imports/new?tournamentId=${tournament.id}`}>
+                  Import first opponent pack
+                </Link>
+                <Link className="text-link" href={`/tournaments/${tournament.id}/opponents/new`}>
+                  Add an existing Player manually
+                </Link>
+              </div>
             )}
           </div>
         ) : (
@@ -187,6 +203,28 @@ export default async function TournamentPage({ params, searchParams }: Tournamen
             ))}
           </ul>
         )}
+      </section>
+
+      <section aria-labelledby="admin-tools-heading" className="section-stack">
+        <div className="section-heading">
+          <h2 id="admin-tools-heading">Administration</h2>
+        </div>
+        <div className="panel empty-state">
+          <p className="muted">
+            These tools are mainly for setup and troubleshooting; the shared coach workflow starts with the opponent list above.
+          </p>
+          <div className="form-actions">
+            <Link className="text-link" href="/imports">
+              Import history
+            </Link>
+            <Link className="text-link" href="/unresolved-players">
+              Unresolved players
+            </Link>
+            <Link className="text-link" href="/tournaments/new">
+              Create another tournament
+            </Link>
+          </div>
+        </div>
       </section>
     </main>
   );
