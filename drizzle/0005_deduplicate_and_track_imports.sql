@@ -22,9 +22,7 @@ ALTER TABLE "import_errors" ADD CONSTRAINT "import_errors_import_id_imports_id_f
 --> statement-breakpoint
 CREATE INDEX "import_errors_import_id_idx" ON "import_errors" USING btree ("import_id");
 --> statement-breakpoint
-ALTER TABLE "imports" DROP CONSTRAINT "imports_counts_nonnegative";
---> statement-breakpoint
-ALTER TABLE "imports" ADD CONSTRAINT "imports_counts_nonnegative" CHECK ("imports"."parsed_count" >= 0 and "imports"."parse_error_count" >= 0 and "imports"."imported_count" >= 0 and "imports"."duplicate_count" >= 0 and "imports"."persistence_error_count" >= 0 and "imports"."unresolved_side_count" >= 0);
+ALTER TABLE "imports" ADD CONSTRAINT "imports_duplicate_count_nonnegative" CHECK ("imports"."duplicate_count" >= 0);
 --> statement-breakpoint
 ALTER TABLE "imports" ADD CONSTRAINT "imports_status_valid" CHECK ("imports"."status" in ('processing', 'completed', 'completed_with_errors', 'failed'));
 --> statement-breakpoint
