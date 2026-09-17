@@ -40,6 +40,7 @@ export type ImportConfirmActionState = {
   importId: number | null;
   parsedCount: number;
   importedCount: number;
+  duplicateCount: number;
   parseErrorCount: number;
   persistenceErrorCount: number;
   unresolvedSideCount: number;
@@ -74,6 +75,7 @@ function confirmErrorState(message: string): ImportConfirmActionState {
     importId: null,
     parsedCount: 0,
     importedCount: 0,
+    duplicateCount: 0,
     parseErrorCount: 0,
     persistenceErrorCount: 0,
     unresolvedSideCount: 0,
@@ -178,8 +180,8 @@ export async function confirmPgnImport(
   if (!validation.ok) return confirmErrorState(validation.message);
 
   try {
-    // Reparse the raw PGN on the server. No parsed move tree or identity decision
-    // submitted by the browser is trusted at the confirmation boundary.
+    // Reparse the raw PGN on the server. Fingerprints, move data, and identity
+    // decisions are therefore generated from trusted server-side parsing.
     const preview = parsePgnPreview(rawPgn);
     if (preview.games.length === 0) {
       return confirmErrorState("No successfully parsed games are available to import.");
@@ -196,10 +198,14 @@ export async function confirmPgnImport(
 
     return {
       status: "result",
-      message: "Import complete. Safely matched games are now available in the player browser.",
+      message:
+        result.duplicateCount > 0
+          ? "Import complete. Already-known games were reused without creating duplicate Game records."
+          : "Import complete. Safely matched games are now available in the player browser.",
       importId: result.importId,
       parsedCount: result.parsedCount,
       importedCount: result.importedCount,
+      duplicateCount: result.duplicateCount,
       parseErrorCount: result.parseErrorCount,
       persistenceErrorCount: result.persistenceErrorCount,
       unresolvedSideCount: result.unresolvedSideCount,
@@ -209,7 +215,7 @@ export async function confirmPgnImport(
   } catch (error) {
     console.error("Failed to persist PGN import", error);
     return confirmErrorState(
-      "The import could not be completed because the database operation failed. Check the game library before retrying.",
+      "The import could not be completed because the database operation failed. Check Import history before retrying.",
     );
   }
 }

@@ -7,6 +7,7 @@ import { asc, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import {
   gameSources,
+  importErrors,
   imports as importRecords,
   players,
   tournamentParticipants,
@@ -15,6 +16,8 @@ import {
 
 import type {
   ImportPersistenceRepository,
+  PersistedImportError,
+  SaveImportedGameResult,
   SaveImportedGameUnit,
 } from "./persist";
 
@@ -29,15 +32,22 @@ function storableFideId(value: string | null) {
   return trimmed && trimmed.length <= 32 ? trimmed : null;
 }
 
-async function saveGameUnit(input: SaveImportedGameUnit) {
+async function saveGameUnit(input: SaveImportedGameUnit): Promise<SaveImportedGameResult> {
   const db = getDb();
   const movesJson = JSON.stringify(input.game.structuredMoves);
   const tagsJson = JSON.stringify(input.game.tags);
 
-  // One SQL statement makes the Game + provenance pair atomic without requiring
-  // an interactive transaction over Neon's HTTP driver.
-  await db.execute(sql`
-    with inserted_game as (
+  // The unique duplicate_fingerprint index makes this UPSERT race-safe. On a
+  // conflict we keep the established Game metadata, fill only previously-null
+  // conservative canonical links/FIDE IDs, and attach this import's provenance
+  // to the winning Game row.
+  const rows = await db.execute(sql<{
+    game_id: number;
+    outcome: "imported" | "duplicate";
+    white_player_id: number | null;
+    black_player_id: number | null;
+  }>`
+    with upserted_game as (
       insert into "games" (
         "white_player_id",
         "black_player_id",
@@ -56,6 +66,7 @@ async function saveGameUnit(input: SaveImportedGameUnit) {
         "opening",
         "source_id",
         "source_game_key",
+        "duplicate_fingerprint",
         "original_pgn",
         "structured_moves"
       ) values (
@@ -76,26 +87,71 @@ async function saveGameUnit(input: SaveImportedGameUnit) {
         ${input.game.opening},
         ${input.sourceId},
         null,
+        ${input.fingerprint},
         ${input.game.originalPgn},
         ${movesJson}::jsonb
       )
-      returning "id"
-    )
-    insert into "import_game_items" (
-      "import_id",
-      "game_id",
-      "source_index",
-      "original_pgn",
-      "raw_tags"
+      on conflict ("duplicate_fingerprint") do update set
+        "white_player_id" = coalesce("games"."white_player_id", excluded."white_player_id"),
+        "black_player_id" = coalesce("games"."black_player_id", excluded."black_player_id"),
+        "white_fide_id" = coalesce("games"."white_fide_id", excluded."white_fide_id"),
+        "black_fide_id" = coalesce("games"."black_fide_id", excluded."black_fide_id")
+      returning
+        "id",
+        "white_player_id",
+        "black_player_id",
+        (xmax = 0) as "inserted"
+    ),
+    inserted_item as (
+      insert into "import_game_items" (
+        "import_id",
+        "game_id",
+        "source_index",
+        "original_pgn",
+        "raw_tags",
+        "outcome"
+      )
+      select
+        ${input.importId},
+        "id",
+        ${input.game.index},
+        ${input.game.originalPgn},
+        ${tagsJson}::jsonb,
+        case when "inserted" then 'imported' else 'duplicate' end
+      from upserted_game
+      returning "game_id", "outcome"
     )
     select
-      ${input.importId},
-      "id",
-      ${input.game.index},
-      ${input.game.originalPgn},
-      ${tagsJson}::jsonb
-    from inserted_game
+      u."id" as "game_id",
+      i."outcome",
+      u."white_player_id",
+      u."black_player_id"
+    from upserted_game u
+    inner join inserted_item i on i."game_id" = u."id"
   `);
+
+  const row = rows[0];
+  if (!row) throw new Error("Imported game could not be persisted.");
+
+  return {
+    gameId: Number(row.game_id),
+    outcome: row.outcome,
+    whitePlayerId: row.white_player_id === null ? null : Number(row.white_player_id),
+    blackPlayerId: row.black_player_id === null ? null : Number(row.black_player_id),
+  };
+}
+
+async function recordImportErrors(importId: number, errors: PersistedImportError[]) {
+  if (errors.length === 0) return;
+
+  await getDb().insert(importErrors).values(
+    errors.map((error) => ({
+      importId,
+      sourceIndex: error.sourceIndex,
+      phase: error.phase,
+      message: error.message,
+    })),
+  );
 }
 
 export function createImportPersistenceRepository(): ImportPersistenceRepository {
@@ -133,6 +189,7 @@ export function createImportPersistenceRepository(): ImportPersistenceRepository
           filename: input.filename,
           parsedCount: input.parsedCount,
           parseErrorCount: input.parseErrorCount,
+          status: "processing",
         })
         .returning({ id: importRecords.id });
 
@@ -141,16 +198,26 @@ export function createImportPersistenceRepository(): ImportPersistenceRepository
     },
 
     saveGameUnit,
+    recordImportErrors,
 
     async finalizeImport(input) {
       await getDb()
         .update(importRecords)
         .set({
           importedCount: input.importedCount,
+          duplicateCount: input.duplicateCount,
           persistenceErrorCount: input.persistenceErrorCount,
           unresolvedSideCount: input.unresolvedSideCount,
+          status: input.status,
         })
         .where(eq(importRecords.id, input.importId));
+    },
+
+    async markImportFailed(importId) {
+      await getDb()
+        .update(importRecords)
+        .set({ status: "failed" })
+        .where(eq(importRecords.id, importId));
     },
 
     async listAffectedPlayerLinks(playerIds) {

@@ -36,6 +36,9 @@ export default async function Home() {
           </p>
         </div>
         <div className="page-header-actions">
+          <Link className="button secondary-button" href="/imports">
+            Import history
+          </Link>
           <Link className="button secondary-button" href="/imports/new">
             Import games
           </Link>
