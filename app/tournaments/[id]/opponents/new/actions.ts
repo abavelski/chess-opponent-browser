@@ -1,10 +1,16 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
 import { getDb } from "@/lib/db";
-import { players, tournamentParticipants, tournaments } from "@/lib/db/schema";
+import {
+  playerAliases,
+  players,
+  tournamentParticipants,
+  tournaments,
+} from "@/lib/db/schema";
+import { normalizeImportedPlayerName } from "@/lib/imports/persist";
 import {
   type OpponentFieldErrors,
   type OpponentFormValues,
@@ -33,6 +39,85 @@ function getValues(formData: FormData): OpponentFormValues {
     federation: String(formData.get("federation") ?? ""),
     rating: String(formData.get("rating") ?? ""),
   };
+}
+
+function addOpponentUrl(tournamentId: number, query = "", error = "") {
+  const params = new URLSearchParams();
+  if (query) params.set("q", query);
+  if (error) params.set("error", error);
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+  return `/tournaments/${tournamentId}/opponents/new${suffix}`;
+}
+
+export async function addExistingOpponentAction(formData: FormData) {
+  const tournamentId = parsePositiveId(formData.get("tournamentId"));
+  const playerId = parsePositiveId(formData.get("playerId"));
+  const query = String(formData.get("query") ?? "").trim();
+
+  if (tournamentId === null) {
+    redirect("/");
+  }
+
+  if (playerId === null) {
+    redirect(addOpponentUrl(tournamentId, query, "Player could not be identified."));
+  }
+
+  const db = getDb();
+  const [tournament] = await db
+    .select({ id: tournaments.id })
+    .from(tournaments)
+    .where(eq(tournaments.id, tournamentId))
+    .limit(1);
+
+  if (!tournament) {
+    redirect("/");
+  }
+
+  const [player] = await db
+    .select({ id: players.id, name: players.name })
+    .from(players)
+    .where(eq(players.id, playerId))
+    .limit(1);
+
+  if (!player) {
+    redirect(addOpponentUrl(tournamentId, query, "That Player no longer exists."));
+  }
+
+  const [existingParticipation] = await db
+    .select({ id: tournamentParticipants.id })
+    .from(tournamentParticipants)
+    .where(
+      and(
+        eq(tournamentParticipants.tournamentId, tournamentId),
+        eq(tournamentParticipants.playerId, playerId),
+      ),
+    )
+    .limit(1);
+
+  if (existingParticipation) {
+    redirect(
+      addOpponentUrl(
+        tournamentId,
+        query,
+        `${player.name} is already in the tournament roster.`,
+      ),
+    );
+  }
+
+  try {
+    await db.insert(tournamentParticipants).values({ tournamentId, playerId });
+  } catch (error) {
+    console.error("Failed to add existing Player to tournament", error);
+    redirect(
+      addOpponentUrl(
+        tournamentId,
+        query,
+        "Player could not be added to the tournament. Refresh and try again.",
+      ),
+    );
+  }
+
+  redirect(`/tournaments/${tournamentId}`);
 }
 
 export async function addOpponentAction(
@@ -102,6 +187,26 @@ export async function addOpponentAction(
         playerId = createdPlayer.id;
       }
     } else {
+      const normalizedName = normalizeImportedPlayerName(validation.data.name);
+      const [existingPlayer] = await db
+        .selectDistinct({ id: players.id, name: players.name })
+        .from(players)
+        .leftJoin(playerAliases, eq(playerAliases.playerId, players.id))
+        .where(
+          or(
+            eq(playerAliases.normalizedKey, normalizedName),
+            sql`lower(regexp_replace(btrim(${players.name}), '[[:space:]]+', ' ', 'g')) = ${normalizedName}`,
+          ),
+        )
+        .limit(1);
+
+      if (existingPlayer) {
+        return {
+          values,
+          error: `“${existingPlayer.name}” already exists. Search above and add the existing Player instead.`,
+        };
+      }
+
       const [createdPlayer] = await db
         .insert(players)
         .values({ name: validation.data.name })
