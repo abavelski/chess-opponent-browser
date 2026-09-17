@@ -37,7 +37,14 @@ const unknownPgn = `[Event "Unknown Side"]
 
 function fakeRepository(
   players: CanonicalPlayerIdentity[],
-  options: { failIndexes?: number[]; duplicateIndexes?: number[] } = {},
+  options: {
+    failIndexes?: number[];
+    duplicateIndexes?: number[];
+    savedPlayerOverrides?: Record<
+      number,
+      { whitePlayerId?: number | null; blackPlayerId?: number | null }
+    >;
+  } = {},
 ) {
   const saved: SaveImportedGameUnit[] = [];
   const recordedErrors: PersistedImportError[] = [];
@@ -49,7 +56,9 @@ function fakeRepository(
     unresolvedSideCount: number;
     status: "completed" | "completed_with_errors";
   }> = [];
+  const participants = new Set<string>();
   let failed = false;
+  let nextPlayerId = Math.max(0, ...players.map((player) => player.id)) + 1;
 
   const repository: ImportPersistenceRepository = {
     async ensureSource(sourceLabel) {
@@ -58,17 +67,35 @@ function fakeRepository(
     async listCanonicalPlayers() {
       return players;
     },
+    async createCanonicalPlayer(input) {
+      const player = { id: nextPlayerId++, name: input.name, fideId: input.fideId };
+      players.push(player);
+      return player;
+    },
+    async rememberPlayerAlias() {},
+    async ensureTournamentParticipant(tournamentId, playerId) {
+      const key = `${tournamentId}:${playerId}`;
+      const added = !participants.has(key);
+      participants.add(key);
+      return { added };
+    },
+    async countGamesForPlayer(playerId) {
+      return saved.filter(
+        (unit) => unit.whitePlayerId === playerId || unit.blackPlayerId === playerId,
+      ).length;
+    },
     async createImport() {
       return 42;
     },
     async saveGameUnit(input) {
       if (options.failIndexes?.includes(input.game.index)) throw new Error("simulated save failure");
       saved.push(input);
+      const override = options.savedPlayerOverrides?.[input.game.index];
       return {
         gameId: 100 + input.game.index,
         outcome: options.duplicateIndexes?.includes(input.game.index) ? "duplicate" : "imported",
-        whitePlayerId: input.whitePlayerId,
-        blackPlayerId: input.blackPlayerId,
+        whitePlayerId: override?.whitePlayerId ?? input.whitePlayerId,
+        blackPlayerId: override?.blackPlayerId ?? input.blackPlayerId,
       };
     },
     async recordImportErrors(_importId, errors) {
@@ -90,7 +117,16 @@ function fakeRepository(
     },
   };
 
-  return { repository, saved, recordedErrors, finalized, get failed() { return failed; } };
+  return {
+    repository,
+    saved,
+    recordedErrors,
+    finalized,
+    participants,
+    get failed() {
+      return failed;
+    },
+  };
 }
 
 describe("PGN import persistence", () => {
@@ -146,6 +182,75 @@ describe("PGN import persistence", () => {
     expect(saved[0].blackPlayerId).toBe(8);
     expect(saved[0].game.white).toBe("Completely Unknown");
     expect(saved[0].fingerprint).toMatch(/^[0-9a-f]{32}$/);
+  });
+
+  it("creates a focal Player, adds it to the roster, and links the matching side", async () => {
+    const preview = parsePgnPreview(unknownPgn);
+    const { repository, saved, participants } = fakeRepository([
+      { id: 8, name: "Unique Name", fideId: null },
+    ]);
+
+    const result = await persistParsedImport(
+      {
+        filename: "pack.pgn",
+        sourceLabel: "Danbase",
+        preview,
+        focalOpponent: {
+          sourceName: "Completely Unknown",
+          sourceFideId: null,
+          canonicalName: "Prepared Opponent",
+          tournamentId: 12,
+        },
+      },
+      repository,
+    );
+
+    expect(saved[0].whitePlayerId).toBe(9);
+    expect(participants.has("12:9")).toBe(true);
+    expect(result.focalOpponent).toMatchObject({
+      playerId: 9,
+      playerName: "Prepared Opponent",
+      playerCreated: true,
+      tournamentId: 12,
+      rosterAdded: true,
+      conflictCount: 0,
+    });
+  });
+
+  it("reports a duplicate focal-side conflict without overwriting the existing Player link", async () => {
+    const preview = parsePgnPreview(unknownPgn);
+    const { repository } = fakeRepository(
+      [
+        { id: 5, name: "Completely Unknown", fideId: null },
+        { id: 8, name: "Unique Name", fideId: null },
+      ],
+      {
+        duplicateIndexes: [1],
+        savedPlayerOverrides: { 1: { whitePlayerId: 99 } },
+      },
+    );
+
+    const result = await persistParsedImport(
+      {
+        filename: "duplicate-pack.pgn",
+        sourceLabel: "Danbase",
+        preview,
+        focalOpponent: {
+          sourceName: "Completely Unknown",
+          sourceFideId: null,
+          canonicalName: "Completely Unknown",
+          tournamentId: 12,
+        },
+      },
+      repository,
+    );
+
+    expect(result.duplicateCount).toBe(1);
+    expect(result.focalOpponent?.conflictCount).toBe(1);
+    expect(result.focalOpponent?.conflicts[0]).toMatchObject({
+      index: 1,
+      side: "White",
+    });
   });
 
   it("preserves original PGN, extra tags, comments, variations, and raw FIDE IDs", async () => {
