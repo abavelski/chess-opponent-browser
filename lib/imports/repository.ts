@@ -2,11 +2,12 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 
-import { asc, eq, inArray, sql } from "drizzle-orm";
+import { asc, eq, inArray, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
 import {
   gameSources,
+  games,
   importErrors,
   imports as importRecords,
   playerAliases,
@@ -136,6 +137,62 @@ export function createImportPersistenceRepository(): ImportPersistenceRepository
       return getDb()
         .select({ playerId: playerAliases.playerId, normalizedKey: playerAliases.normalizedKey })
         .from(playerAliases);
+    },
+
+    async createCanonicalPlayer(input) {
+      const db = getDb();
+      if (input.fideId) {
+        const [created] = await db
+          .insert(players)
+          .values({ name: input.name, fideId: input.fideId })
+          .onConflictDoNothing({ target: players.fideId })
+          .returning({ id: players.id, name: players.name, fideId: players.fideId });
+        if (created) return created;
+
+        const [existing] = await db
+          .select({ id: players.id, name: players.name, fideId: players.fideId })
+          .from(players)
+          .where(eq(players.fideId, input.fideId))
+          .limit(1);
+        if (existing) return existing;
+      }
+
+      const [created] = await db
+        .insert(players)
+        .values({ name: input.name })
+        .returning({ id: players.id, name: players.name, fideId: players.fideId });
+      if (!created) throw new Error("Focal Player could not be created.");
+      return created;
+    },
+
+    async rememberPlayerAlias(input) {
+      await getDb()
+        .insert(playerAliases)
+        .values({
+          playerId: input.playerId,
+          aliasText: input.aliasText,
+          normalizedKey: input.normalizedKey,
+        })
+        .onConflictDoNothing({ target: playerAliases.normalizedKey });
+    },
+
+    async ensureTournamentParticipant(tournamentId, playerId) {
+      const [created] = await getDb()
+        .insert(tournamentParticipants)
+        .values({ tournamentId, playerId })
+        .onConflictDoNothing({
+          target: [tournamentParticipants.tournamentId, tournamentParticipants.playerId],
+        })
+        .returning({ id: tournamentParticipants.id });
+      return { added: Boolean(created) };
+    },
+
+    async countGamesForPlayer(playerId) {
+      const [row] = await getDb()
+        .select({ count: sql<number>`count(*)` })
+        .from(games)
+        .where(or(eq(games.whitePlayerId, playerId), eq(games.blackPlayerId, playerId)));
+      return Number(row?.count ?? 0);
     },
 
     async createImport(input) {
