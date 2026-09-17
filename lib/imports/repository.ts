@@ -1,0 +1,173 @@
+import "server-only";
+
+import { createHash } from "node:crypto";
+
+import { asc, eq, inArray, sql } from "drizzle-orm";
+
+import { getDb } from "@/lib/db";
+import {
+  gameSources,
+  imports as importRecords,
+  players,
+  tournamentParticipants,
+  tournaments,
+} from "@/lib/db/schema";
+
+import type {
+  ImportPersistenceRepository,
+  SaveImportedGameUnit,
+} from "./persist";
+
+function sourceKeyForLabel(label: string) {
+  const normalized = label.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
+  const digest = createHash("sha256").update(normalized).digest("hex").slice(0, 32);
+  return `import-${digest}`;
+}
+
+function storableFideId(value: string | null) {
+  const trimmed = value?.trim() ?? "";
+  return trimmed && trimmed.length <= 32 ? trimmed : null;
+}
+
+async function saveGameUnit(input: SaveImportedGameUnit) {
+  const db = getDb();
+  const movesJson = JSON.stringify(input.game.structuredMoves);
+  const tagsJson = JSON.stringify(input.game.tags);
+
+  // One SQL statement makes the Game + provenance pair atomic without requiring
+  // an interactive transaction over Neon's HTTP driver.
+  await db.execute(sql`
+    with inserted_game as (
+      insert into "games" (
+        "white_player_id",
+        "black_player_id",
+        "white_name",
+        "black_name",
+        "white_rating",
+        "black_rating",
+        "white_fide_id",
+        "black_fide_id",
+        "played_on",
+        "result",
+        "event",
+        "site",
+        "round",
+        "eco",
+        "opening",
+        "source_id",
+        "source_game_key",
+        "original_pgn",
+        "structured_moves"
+      ) values (
+        ${input.whitePlayerId},
+        ${input.blackPlayerId},
+        ${input.game.white},
+        ${input.game.black},
+        ${input.game.whiteRating},
+        ${input.game.blackRating},
+        ${storableFideId(input.game.whiteFideId)},
+        ${storableFideId(input.game.blackFideId)},
+        ${input.game.playedOn},
+        ${input.game.result},
+        ${input.game.event},
+        ${input.game.site},
+        ${input.game.round},
+        ${input.game.eco},
+        ${input.game.opening},
+        ${input.sourceId},
+        null,
+        ${input.game.originalPgn},
+        ${movesJson}::jsonb
+      )
+      returning "id"
+    )
+    insert into "import_game_items" (
+      "import_id",
+      "game_id",
+      "source_index",
+      "original_pgn",
+      "raw_tags"
+    )
+    select
+      ${input.importId},
+      "id",
+      ${input.game.index},
+      ${input.game.originalPgn},
+      ${tagsJson}::jsonb
+    from inserted_game
+  `);
+}
+
+export function createImportPersistenceRepository(): ImportPersistenceRepository {
+  return {
+    async ensureSource(sourceLabel) {
+      const db = getDb();
+      const [source] = await db
+        .insert(gameSources)
+        .values({
+          sourceKey: sourceKeyForLabel(sourceLabel),
+          label: sourceLabel,
+          isFixture: false,
+        })
+        .onConflictDoUpdate({
+          target: gameSources.sourceKey,
+          set: { label: sourceLabel, isFixture: false },
+        })
+        .returning({ id: gameSources.id, label: gameSources.label });
+
+      if (!source) throw new Error("Import source could not be created.");
+      return source;
+    },
+
+    async listCanonicalPlayers() {
+      return getDb()
+        .select({ id: players.id, name: players.name, fideId: players.fideId })
+        .from(players);
+    },
+
+    async createImport(input) {
+      const [created] = await getDb()
+        .insert(importRecords)
+        .values({
+          sourceId: input.sourceId,
+          filename: input.filename,
+          parsedCount: input.parsedCount,
+          parseErrorCount: input.parseErrorCount,
+        })
+        .returning({ id: importRecords.id });
+
+      if (!created) throw new Error("Import could not be created.");
+      return created.id;
+    },
+
+    saveGameUnit,
+
+    async finalizeImport(input) {
+      await getDb()
+        .update(importRecords)
+        .set({
+          importedCount: input.importedCount,
+          persistenceErrorCount: input.persistenceErrorCount,
+          unresolvedSideCount: input.unresolvedSideCount,
+        })
+        .where(eq(importRecords.id, input.importId));
+    },
+
+    async listAffectedPlayerLinks(playerIds) {
+      if (playerIds.length === 0) return [];
+
+      return getDb()
+        .select({
+          playerId: players.id,
+          playerName: players.name,
+          tournamentId: tournaments.id,
+          tournamentName: tournaments.name,
+        })
+        .from(tournamentParticipants)
+        .innerJoin(players, eq(tournamentParticipants.playerId, players.id))
+        .innerJoin(tournaments, eq(tournamentParticipants.tournamentId, tournaments.id))
+        .where(inArray(players.id, playerIds))
+        .orderBy(asc(players.name), asc(tournaments.name));
+    },
+  };
+}
