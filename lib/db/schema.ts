@@ -30,10 +30,7 @@ export const tournaments = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
-    check(
-      "tournaments_name_not_blank",
-      sql`char_length(btrim(${table.name})) > 0`,
-    ),
+    check("tournaments_name_not_blank", sql`char_length(btrim(${table.name})) > 0`),
   ],
 );
 
@@ -50,6 +47,31 @@ export const players = pgTable(
     check(
       "players_fide_id_not_blank",
       sql`${table.fideId} is null or char_length(btrim(${table.fideId})) > 0`,
+    ),
+  ],
+);
+
+export const playerAliases = pgTable(
+  "player_aliases",
+  {
+    id: serial("id").primaryKey(),
+    playerId: integer("player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "cascade" }),
+    aliasText: varchar("alias_text", { length: 200 }).notNull(),
+    normalizedKey: varchar("normalized_key", { length: 200 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("player_aliases_player_id_idx").on(table.playerId),
+    uniqueIndex("player_aliases_normalized_key_unique").on(table.normalizedKey),
+    check(
+      "player_aliases_text_not_blank",
+      sql`char_length(btrim(${table.aliasText})) > 0`,
+    ),
+    check(
+      "player_aliases_normalized_key_not_blank",
+      sql`char_length(btrim(${table.normalizedKey})) > 0`,
     ),
   ],
 );

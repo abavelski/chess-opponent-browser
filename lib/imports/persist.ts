@@ -7,9 +7,14 @@ export type CanonicalPlayerIdentity = {
   fideId: string | null;
 };
 
+export type PlayerAliasIdentity = {
+  playerId: number;
+  normalizedKey: string;
+};
+
 export type ImportedSideResolution = {
   playerId: number | null;
-  method: "fide" | "name" | null;
+  method: "fide" | "alias" | "name" | null;
 };
 
 export type AffectedPlayerLink = {
@@ -48,6 +53,7 @@ export type ImportStatus = "processing" | "completed" | "completed_with_errors" 
 export type ImportPersistenceRepository = {
   ensureSource(sourceLabel: string): Promise<{ id: number; label: string }>;
   listCanonicalPlayers(): Promise<CanonicalPlayerIdentity[]>;
+  listPlayerAliases?(): Promise<PlayerAliasIdentity[]>;
   createImport(input: {
     sourceId: number;
     filename: string;
@@ -81,7 +87,9 @@ export type PersistImportResult = {
 };
 
 type IdentityIndex = {
+  byId: Map<number, CanonicalPlayerIdentity>;
   byFideId: Map<string, CanonicalPlayerIdentity[]>;
+  byAliasKey: Map<string, CanonicalPlayerIdentity[]>;
   byNormalizedName: Map<string, CanonicalPlayerIdentity[]>;
 };
 
@@ -94,11 +102,26 @@ function usableFideId(value: string | null) {
   return fideId && fideId.length <= 32 ? fideId : null;
 }
 
-export function buildIdentityIndex(players: CanonicalPlayerIdentity[]): IdentityIndex {
+function targetContradictsSourceFide(
+  sourceFideId: string | null,
+  target: CanonicalPlayerIdentity,
+) {
+  const source = usableFideId(sourceFideId);
+  const targetFide = usableFideId(target.fideId);
+  return Boolean(source && targetFide && source !== targetFide);
+}
+
+export function buildIdentityIndex(
+  players: CanonicalPlayerIdentity[],
+  aliases: PlayerAliasIdentity[] = [],
+): IdentityIndex {
+  const byId = new Map<number, CanonicalPlayerIdentity>();
   const byFideId = new Map<string, CanonicalPlayerIdentity[]>();
+  const byAliasKey = new Map<string, CanonicalPlayerIdentity[]>();
   const byNormalizedName = new Map<string, CanonicalPlayerIdentity[]>();
 
   for (const player of players) {
+    byId.set(player.id, player);
     const fideId = usableFideId(player.fideId);
     if (fideId) byFideId.set(fideId, [...(byFideId.get(fideId) ?? []), player]);
 
@@ -111,7 +134,27 @@ export function buildIdentityIndex(players: CanonicalPlayerIdentity[]): Identity
     }
   }
 
-  return { byFideId, byNormalizedName };
+  for (const alias of aliases) {
+    const player = byId.get(alias.playerId);
+    if (!player) continue;
+    const key = normalizeImportedPlayerName(alias.normalizedKey);
+    if (!key) continue;
+    const current = byAliasKey.get(key) ?? [];
+    if (!current.some((candidate) => candidate.id === player.id)) {
+      byAliasKey.set(key, [...current, player]);
+    }
+  }
+
+  return { byId, byFideId, byAliasKey, byNormalizedName };
+}
+
+function uniqueSafeMatch(
+  candidates: CanonicalPlayerIdentity[],
+  sourceFideId: string | null,
+): CanonicalPlayerIdentity | null {
+  if (candidates.length !== 1) return null;
+  const target = candidates[0];
+  return targetContradictsSourceFide(sourceFideId, target) ? null : target;
 }
 
 export function resolveImportedSide(
@@ -125,8 +168,15 @@ export function resolveImportedSide(
   }
 
   const normalizedName = normalizeImportedPlayerName(input.name);
-  const nameMatches = normalizedName ? index.byNormalizedName.get(normalizedName) ?? [] : [];
-  if (nameMatches.length === 1) return { playerId: nameMatches[0].id, method: "name" };
+  const aliasMatch = normalizedName
+    ? uniqueSafeMatch(index.byAliasKey.get(normalizedName) ?? [], input.fideId)
+    : null;
+  if (aliasMatch) return { playerId: aliasMatch.id, method: "alias" };
+
+  const nameMatch = normalizedName
+    ? uniqueSafeMatch(index.byNormalizedName.get(normalizedName) ?? [], input.fideId)
+    : null;
+  if (nameMatch) return { playerId: nameMatch.id, method: "name" };
 
   return { playerId: null, method: null };
 }
@@ -141,7 +191,8 @@ export async function persistParsedImport(
 ): Promise<PersistImportResult> {
   const source = await repository.ensureSource(input.sourceLabel);
   const players = await repository.listCanonicalPlayers();
-  const identities = buildIdentityIndex(players);
+  const aliases = repository.listPlayerAliases ? await repository.listPlayerAliases() : [];
+  const identities = buildIdentityIndex(players, aliases);
   const importId = await repository.createImport({
     sourceId: source.id,
     filename: input.filename,

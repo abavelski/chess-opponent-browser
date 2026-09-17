@@ -36,6 +36,9 @@ export default async function Home() {
           </p>
         </div>
         <div className="page-header-actions">
+          <Link className="button secondary-button" href="/identities">
+            Unresolved identities
+          </Link>
           <Link className="button secondary-button" href="/imports">
             Import history
           </Link>
