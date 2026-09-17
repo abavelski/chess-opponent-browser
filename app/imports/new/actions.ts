@@ -5,8 +5,13 @@ import {
   parsePgnPreview,
   validatePgnUploadMetadata,
 } from "@/lib/imports/pgn";
-import { persistParsedImport } from "@/lib/imports/persist";
+import {
+  analyzeOpponentPack,
+  type OpponentPackCandidate,
+} from "@/lib/imports/opponent-pack";
+import { persistParsedImport, type FocalOpponentResult } from "@/lib/imports/persist";
 import { createImportPersistenceRepository } from "@/lib/imports/repository";
+import { PLAYER_NAME_MAX_LENGTH } from "@/lib/players/validation";
 
 export type ImportPreviewListItem = {
   index: number;
@@ -32,6 +37,8 @@ export type ImportPreviewActionState = {
   games: ImportPreviewListItem[];
   errors: Array<{ index: number; message: string }>;
   rawPgn: string | null;
+  focalCandidates: OpponentPackCandidate[];
+  suggestedFocalName: string | null;
 };
 
 export type ImportConfirmActionState = {
@@ -51,6 +58,7 @@ export type ImportConfirmActionState = {
     tournamentId: number;
     tournamentName: string;
   }>;
+  focalOpponent: FocalOpponentResult | null;
 };
 
 function previewErrorState(message: string, sourceLabel: string): ImportPreviewActionState {
@@ -65,6 +73,8 @@ function previewErrorState(message: string, sourceLabel: string): ImportPreviewA
     games: [],
     errors: [],
     rawPgn: null,
+    focalCandidates: [],
+    suggestedFocalName: null,
   };
 }
 
@@ -81,7 +91,14 @@ function confirmErrorState(message: string): ImportConfirmActionState {
     unresolvedSideCount: 0,
     persistenceErrors: [],
     affectedPlayers: [],
+    focalOpponent: null,
   };
+}
+
+function parsePositiveId(value: FormDataEntryValue | null) {
+  if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) return null;
+  const id = Number(value);
+  return Number.isSafeInteger(id) ? id : null;
 }
 
 export async function previewPgnImport(
@@ -122,12 +139,13 @@ export async function previewPgnImport(
 
   try {
     const preview = parsePgnPreview(rawPgn);
+    const pack = analyzeOpponentPack(preview);
     return {
       status: "preview",
       message:
         preview.games.length === 0
           ? "No games could be parsed. Nothing has been saved."
-          : "Preview complete. Nothing has been saved yet.",
+          : "Preview complete. Choose the focal opponent for this pack, then confirm the import.",
       sourceLabel: validation.sourceLabel,
       filename: uploaded.name,
       gamesFound: preview.gamesFound,
@@ -147,6 +165,8 @@ export async function previewPgnImport(
       })),
       errors: preview.errors,
       rawPgn,
+      focalCandidates: pack.candidates,
+      suggestedFocalName: pack.suggestedNormalizedName,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "The PGN could not be parsed.";
@@ -161,6 +181,9 @@ export async function confirmPgnImport(
   const filename = formData.get("filename");
   const sourceLabel = formData.get("sourceLabel");
   const rawPgn = formData.get("rawPgn");
+  const focalNameKey = formData.get("focalName");
+  const canonicalNameInput = formData.get("canonicalName");
+  const tournamentId = parsePositiveId(formData.get("tournamentId"));
 
   if (
     typeof filename !== "string" ||
@@ -169,6 +192,24 @@ export async function confirmPgnImport(
     !rawPgn
   ) {
     return confirmErrorState("The preview is no longer available. Preview the PGN again.");
+  }
+
+  if (typeof focalNameKey !== "string" || !focalNameKey) {
+    return confirmErrorState("Choose the focal opponent for this PGN pack.");
+  }
+
+  const canonicalName =
+    typeof canonicalNameInput === "string" ? canonicalNameInput.trim() : "";
+  if (!canonicalName) {
+    return confirmErrorState("Enter a canonical display name for the focal opponent.");
+  }
+  if (canonicalName.length > PLAYER_NAME_MAX_LENGTH) {
+    return confirmErrorState(
+      `Canonical player name must be ${PLAYER_NAME_MAX_LENGTH} characters or fewer.`,
+    );
+  }
+  if (tournamentId === null) {
+    return confirmErrorState("Choose the preparation tournament for this opponent pack.");
   }
 
   const byteLength = new TextEncoder().encode(rawPgn).byteLength;
@@ -180,11 +221,19 @@ export async function confirmPgnImport(
   if (!validation.ok) return confirmErrorState(validation.message);
 
   try {
-    // Reparse the raw PGN on the server. Fingerprints, move data, and identity
-    // decisions are therefore generated from trusted server-side parsing.
     const preview = parsePgnPreview(rawPgn);
     if (preview.games.length === 0) {
       return confirmErrorState("No successfully parsed games are available to import.");
+    }
+
+    const pack = analyzeOpponentPack(preview);
+    const focalCandidate = pack.candidates.find(
+      (candidate) => candidate.normalizedName === focalNameKey,
+    );
+    if (!focalCandidate) {
+      return confirmErrorState(
+        "The selected focal opponent is no longer present in the parsed PGN. Preview it again.",
+      );
     }
 
     const result = await persistParsedImport(
@@ -192,16 +241,24 @@ export async function confirmPgnImport(
         filename,
         sourceLabel: validation.sourceLabel,
         preview,
+        focalOpponent: {
+          sourceName: focalCandidate.name,
+          sourceFideId: focalCandidate.fideId,
+          canonicalName,
+          tournamentId,
+        },
       },
       createImportPersistenceRepository(),
     );
 
+    const focal = result.focalOpponent;
     return {
       status: "result",
-      message:
-        result.duplicateCount > 0
-          ? "Import complete. Already-known games were reused without creating duplicate Game records."
-          : "Import complete. Safely matched games are now available in the player browser.",
+      message: focal
+        ? `${focal.playerName} is ${focal.playerCreated ? "created" : "reused"} and ${
+            focal.rosterAdded ? "added to" : "already in"
+          } the preparation roster. ${focal.visibleGameCount} games are now visible for this opponent.`
+        : "Import complete.",
       importId: result.importId,
       parsedCount: result.parsedCount,
       importedCount: result.importedCount,
@@ -211,11 +268,12 @@ export async function confirmPgnImport(
       unresolvedSideCount: result.unresolvedSideCount,
       persistenceErrors: result.persistenceErrors,
       affectedPlayers: result.affectedPlayers,
+      focalOpponent: focal,
     };
   } catch (error) {
-    console.error("Failed to persist PGN import", error);
+    console.error("Failed to persist opponent PGN pack", error);
     return confirmErrorState(
-      "The import could not be completed because the database operation failed. Check Import history before retrying.",
+      "The opponent pack could not be completed because the database operation failed. Check Import history before retrying.",
     );
   }
 }
