@@ -8,6 +8,7 @@ import {
   resolveImportedSide,
   type CanonicalPlayerIdentity,
   type ImportPersistenceRepository,
+  type PersistedImportError,
   type SaveImportedGameUnit,
 } from "@/lib/imports/persist";
 
@@ -27,6 +28,7 @@ const annotatedPgn = `[Event "Persistence Cup"]
 1. e4 {Stored comment} e5 2. Nf3 (2. Bc4 {Stored variation} Nc6) Nc6 1-0`;
 
 const unknownPgn = `[Event "Unknown Side"]
+[Date "2026.09.16"]
 [White "Completely Unknown"]
 [Black "Unique Name"]
 [Result "1/2-1/2"]
@@ -35,15 +37,19 @@ const unknownPgn = `[Event "Unknown Side"]
 
 function fakeRepository(
   players: CanonicalPlayerIdentity[],
-  options: { failIndexes?: number[] } = {},
+  options: { failIndexes?: number[]; duplicateIndexes?: number[] } = {},
 ) {
   const saved: SaveImportedGameUnit[] = [];
+  const recordedErrors: PersistedImportError[] = [];
   const finalized: Array<{
     importId: number;
     importedCount: number;
+    duplicateCount: number;
     persistenceErrorCount: number;
     unresolvedSideCount: number;
+    status: "completed" | "completed_with_errors";
   }> = [];
+  let failed = false;
 
   const repository: ImportPersistenceRepository = {
     async ensureSource(sourceLabel) {
@@ -58,9 +64,21 @@ function fakeRepository(
     async saveGameUnit(input) {
       if (options.failIndexes?.includes(input.game.index)) throw new Error("simulated save failure");
       saved.push(input);
+      return {
+        gameId: 100 + input.game.index,
+        outcome: options.duplicateIndexes?.includes(input.game.index) ? "duplicate" : "imported",
+        whitePlayerId: input.whitePlayerId,
+        blackPlayerId: input.blackPlayerId,
+      };
+    },
+    async recordImportErrors(_importId, errors) {
+      recordedErrors.push(...errors);
     },
     async finalizeImport(input) {
       finalized.push(input);
+    },
+    async markImportFailed() {
+      failed = true;
     },
     async listAffectedPlayerLinks(playerIds) {
       return playerIds.map((playerId) => ({
@@ -72,7 +90,7 @@ function fakeRepository(
     },
   };
 
-  return { repository, saved, finalized };
+  return { repository, saved, recordedErrors, finalized, get failed() { return failed; } };
 }
 
 describe("PGN import persistence", () => {
@@ -122,11 +140,12 @@ describe("PGN import persistence", () => {
       repository,
     );
 
-    expect(result).toMatchObject({ importedCount: 1, unresolvedSideCount: 1 });
+    expect(result).toMatchObject({ importedCount: 1, duplicateCount: 0, unresolvedSideCount: 1 });
     expect(saved).toHaveLength(1);
     expect(saved[0].whitePlayerId).toBeNull();
     expect(saved[0].blackPlayerId).toBe(8);
     expect(saved[0].game.white).toBe("Completely Unknown");
+    expect(saved[0].fingerprint).toMatch(/^[0-9a-f]{32}$/);
   });
 
   it("preserves original PGN, extra tags, comments, variations, and raw FIDE IDs", async () => {
@@ -141,7 +160,7 @@ describe("PGN import persistence", () => {
       repository,
     );
 
-    expect(result).toMatchObject({ importedCount: 1, unresolvedSideCount: 0 });
+    expect(result).toMatchObject({ importedCount: 1, duplicateCount: 0, unresolvedSideCount: 0 });
     expect(saved[0]).toMatchObject({ whitePlayerId: 1, blackPlayerId: 2 });
     expect(saved[0].game.whiteFideId).toBe("99000001");
     expect(saved[0].game.tags.CustomArchiveKey).toBe("persist-123");
@@ -153,9 +172,34 @@ describe("PGN import persistence", () => {
     });
   });
 
+  it("accounts for already-known games separately from newly imported games", async () => {
+    const preview = parsePgnPreview(`${annotatedPgn}\n\n${unknownPgn}`);
+    const { repository, finalized } = fakeRepository(
+      [
+        { id: 1, name: "Jan Kowalski", fideId: "99000001" },
+        { id: 2, name: "Anna Nowak", fideId: "99000002" },
+        { id: 8, name: "Unique Name", fideId: null },
+      ],
+      { duplicateIndexes: [1] },
+    );
+
+    const result = await persistParsedImport(
+      { filename: "mixed.pgn", sourceLabel: "Manual", preview },
+      repository,
+    );
+
+    expect(result).toMatchObject({
+      parsedCount: 2,
+      importedCount: 1,
+      duplicateCount: 1,
+      persistenceErrorCount: 0,
+    });
+    expect(finalized[0]).toMatchObject({ importedCount: 1, duplicateCount: 1, status: "completed" });
+  });
+
   it("reports one failed save without corrupting successful sibling units", async () => {
     const preview = parsePgnPreview(`${annotatedPgn}\n\n${unknownPgn}`);
-    const { repository, saved, finalized } = fakeRepository(
+    const { repository, saved, finalized, recordedErrors } = fakeRepository(
       [
         { id: 1, name: "Jan Kowalski", fideId: "99000001" },
         { id: 2, name: "Anna Nowak", fideId: "99000002" },
@@ -173,18 +217,26 @@ describe("PGN import persistence", () => {
     expect(result).toMatchObject({
       parsedCount: 2,
       importedCount: 1,
+      duplicateCount: 0,
       persistenceErrorCount: 1,
       unresolvedSideCount: 0,
     });
     expect(result.persistenceErrors).toEqual([
       { index: 2, message: "This parsed game could not be saved." },
     ]);
+    expect(recordedErrors).toContainEqual({
+      sourceIndex: 2,
+      phase: "persistence",
+      message: "This parsed game could not be saved.",
+    });
     expect(finalized).toEqual([
       {
         importId: 42,
         importedCount: 1,
+        duplicateCount: 0,
         persistenceErrorCount: 1,
         unresolvedSideCount: 0,
+        status: "completed_with_errors",
       },
     ]);
   });

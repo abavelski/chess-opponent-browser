@@ -29,6 +29,7 @@ const initialConfirmState: ImportConfirmActionState = {
   importId: null,
   parsedCount: 0,
   importedCount: 0,
+  duplicateCount: 0,
   parseErrorCount: 0,
   persistenceErrorCount: 0,
   unresolvedSideCount: 0,
@@ -68,7 +69,7 @@ function ConfirmImportForm({ preview }: { preview: ImportPreviewActionState }) {
             <dd>{preview.sourceLabel}</dd>
           </div>
           <div>
-            <dt>Games to import</dt>
+            <dt>Games parsed</dt>
             <dd>{preview.parsedCount}</dd>
           </div>
           <div>
@@ -78,9 +79,9 @@ function ConfirmImportForm({ preview }: { preview: ImportPreviewActionState }) {
         </dl>
 
         <p className="helper-text">
-          Only successfully parsed games will be saved. Unknown or ambiguous player identities are
-          preserved as unresolved sides rather than guessed. Duplicate detection arrives in Task 008,
-          so do not intentionally import the same file twice yet.
+          Only successfully parsed games are processed. Obvious already-known games reuse the
+          existing global Game while preserving this import&apos;s PGN/source provenance. Unknown or
+          ambiguous player identities remain unresolved rather than being guessed.
         </p>
 
         <form action={action}>
@@ -125,6 +126,10 @@ function ConfirmImportForm({ preview }: { preview: ImportPreviewActionState }) {
               <dd>{result.importedCount}</dd>
             </div>
             <div className="panel">
+              <dt>Already known</dt>
+              <dd>{result.duplicateCount}</dd>
+            </div>
+            <div className="panel">
               <dt>Errors</dt>
               <dd>{totalErrors}</dd>
             </div>
@@ -133,6 +138,17 @@ function ConfirmImportForm({ preview }: { preview: ImportPreviewActionState }) {
               <dd>{result.unresolvedSideCount}</dd>
             </div>
           </dl>
+
+          <div className="import-result-links">
+            {result.importId ? (
+              <Link className="button secondary-button" href={`/imports/${result.importId}`}>
+                View import details
+              </Link>
+            ) : null}
+            <Link className="text-link" href="/imports">
+              Import history →
+            </Link>
+          </div>
 
           {result.persistenceErrors.length > 0 ? (
             <div className="panel import-errors" role="alert">
@@ -152,7 +168,7 @@ function ConfirmImportForm({ preview }: { preview: ImportPreviewActionState }) {
               <h3>Verify imported games</h3>
               <p className="muted">
                 These safely matched players are already in tournament rosters. Open one to verify
-                the new game in the normal browse/filter/viewer flow.
+                the game in the normal browse/filter/viewer flow.
               </p>
               <ul>
                 {result.affectedPlayers.map((player) => (
@@ -224,6 +240,9 @@ export function ImportForm() {
             <button className="button" disabled={pending} type="submit">
               {pending ? "Parsing…" : "Preview PGN"}
             </button>
+            <Link className="text-link" href="/imports">
+              View import history →
+            </Link>
           </div>
         </form>
       </section>

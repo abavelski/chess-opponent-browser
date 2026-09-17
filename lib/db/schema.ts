@@ -11,6 +11,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
 
@@ -131,6 +132,7 @@ export const games = pgTable(
       .notNull()
       .references(() => gameSources.id),
     sourceGameKey: varchar("source_game_key", { length: 160 }),
+    duplicateFingerprint: varchar("duplicate_fingerprint", { length: 32 }),
     originalPgn: text("original_pgn").notNull(),
     structuredMoves: jsonb("structured_moves").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -139,6 +141,7 @@ export const games = pgTable(
     unique("games_source_game_key_unique").on(table.sourceId, table.sourceGameKey),
     index("games_white_player_played_on_idx").on(table.whitePlayerId, table.playedOn),
     index("games_black_player_played_on_idx").on(table.blackPlayerId, table.playedOn),
+    uniqueIndex("games_duplicate_fingerprint_unique").on(table.duplicateFingerprint),
     check("games_white_name_not_blank", sql`char_length(btrim(${table.whiteName})) > 0`),
     check("games_black_name_not_blank", sql`char_length(btrim(${table.blackName})) > 0`),
     check(
@@ -175,8 +178,10 @@ export const imports = pgTable(
     parsedCount: integer("parsed_count").notNull(),
     parseErrorCount: integer("parse_error_count").notNull(),
     importedCount: integer("imported_count").default(0).notNull(),
+    duplicateCount: integer("duplicate_count").default(0).notNull(),
     persistenceErrorCount: integer("persistence_error_count").default(0).notNull(),
     unresolvedSideCount: integer("unresolved_side_count").default(0).notNull(),
+    status: varchar("status", { length: 24 }).default("processing").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
@@ -185,6 +190,11 @@ export const imports = pgTable(
     check(
       "imports_counts_nonnegative",
       sql`${table.parsedCount} >= 0 and ${table.parseErrorCount} >= 0 and ${table.importedCount} >= 0 and ${table.persistenceErrorCount} >= 0 and ${table.unresolvedSideCount} >= 0`,
+    ),
+    check("imports_duplicate_count_nonnegative", sql`${table.duplicateCount} >= 0`),
+    check(
+      "imports_status_valid",
+      sql`${table.status} in ('processing', 'completed', 'completed_with_errors', 'failed')`,
     ),
   ],
 );
@@ -202,6 +212,7 @@ export const importGameItems = pgTable(
     sourceIndex: integer("source_index").notNull(),
     originalPgn: text("original_pgn").notNull(),
     rawTags: jsonb("raw_tags").notNull(),
+    outcome: varchar("outcome", { length: 16 }).default("imported").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
@@ -212,5 +223,29 @@ export const importGameItems = pgTable(
       "import_game_items_original_pgn_not_blank",
       sql`char_length(btrim(${table.originalPgn})) > 0`,
     ),
+    check(
+      "import_game_items_outcome_valid",
+      sql`${table.outcome} in ('imported', 'duplicate')`,
+    ),
+  ],
+);
+
+export const importErrors = pgTable(
+  "import_errors",
+  {
+    id: serial("id").primaryKey(),
+    importId: integer("import_id")
+      .notNull()
+      .references(() => imports.id, { onDelete: "cascade" }),
+    sourceIndex: integer("source_index").notNull(),
+    phase: varchar("phase", { length: 16 }).notNull(),
+    message: text("message").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("import_errors_import_id_idx").on(table.importId),
+    check("import_errors_source_index_positive", sql`${table.sourceIndex} >= 1`),
+    check("import_errors_phase_valid", sql`${table.phase} in ('parse', 'persistence')`),
+    check("import_errors_message_not_blank", sql`char_length(btrim(${table.message})) > 0`),
   ],
 );
