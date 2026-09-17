@@ -17,12 +17,14 @@
   padding: 0.6rem;
 }
 
-.import-form-panel button:disabled {
+.import-form-panel button:disabled,
+.import-confirm-panel button:disabled {
   cursor: progress;
   opacity: 0.65;
 }
 
-.import-preview-section {
+.import-preview-section,
+.import-result-section {
   gap: 1rem;
 }
 
@@ -55,12 +57,17 @@
   margin: 0;
 }
 
+.import-result-summary {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .import-summary > div {
   padding: 1rem;
 }
 
 .import-summary dt,
-.import-game-metadata dt {
+.import-game-metadata dt,
+.import-confirm-details dt {
   color: var(--muted);
   font-size: 0.74rem;
   font-weight: 700;
@@ -79,7 +86,8 @@
   border-color: #e6baba;
 }
 
-.import-errors ul {
+.import-errors ul,
+.import-affected-players ul {
   display: grid;
   gap: 0.45rem;
   margin: 0;
@@ -117,9 +125,50 @@
   border-top: 1px solid var(--border);
 }
 
-.import-game-metadata dd {
+.import-game-metadata dd,
+.import-confirm-details dd {
   margin: 0.25rem 0 0;
   overflow-wrap: anywhere;
+}
+
+.import-confirm-stack {
+  display: grid;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.import-confirm-panel,
+.import-affected-players {
+  display: grid;
+  gap: 1rem;
+  padding: 1.15rem;
+}
+
+.import-confirm-panel h3,
+.import-affected-players h3 {
+  margin-bottom: 0;
+}
+
+.import-confirm-details {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.import-confirm-details > div {
+  min-width: 0;
+  padding: 0.75rem;
+  border-radius: 0.55rem;
+  background: var(--surface-muted);
+}
+
+.import-confirm-error {
+  margin-top: 1rem;
+}
+
+.import-affected-players p {
+  margin-bottom: 0;
 }
 
 @media (max-width: 760px) {
@@ -128,8 +177,10 @@
     flex-direction: column;
   }
 
-  .import-summary {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .import-summary,
+  .import-result-summary,
+  .import-confirm-details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .import-game-metadata {
@@ -138,7 +189,9 @@
 }
 
 @media (max-width: 480px) {
-  .import-summary {
+  .import-summary,
+  .import-result-summary,
+  .import-confirm-details {
     grid-template-columns: 1fr;
   }
 }

@@ -118,6 +118,8 @@ export const games = pgTable(
     blackName: varchar("black_name", { length: 200 }).notNull(),
     whiteRating: integer("white_rating"),
     blackRating: integer("black_rating"),
+    whiteFideId: varchar("white_fide_id", { length: 32 }),
+    blackFideId: varchar("black_fide_id", { length: 32 }),
     playedOn: date("played_on"),
     result: varchar("result", { length: 7 }).default("*").notNull(),
     event: varchar("event", { length: 250 }),
@@ -148,8 +150,67 @@ export const games = pgTable(
       sql`${table.blackRating} is null or (${table.blackRating} >= 1 and ${table.blackRating} <= 4000)`,
     ),
     check(
+      "games_white_fide_id_not_blank",
+      sql`${table.whiteFideId} is null or char_length(btrim(${table.whiteFideId})) > 0`,
+    ),
+    check(
+      "games_black_fide_id_not_blank",
+      sql`${table.blackFideId} is null or char_length(btrim(${table.blackFideId})) > 0`,
+    ),
+    check(
       "games_result_format",
       sql`${table.result} in ('1-0', '0-1', '1/2-1/2', '*')`,
+    ),
+  ],
+);
+
+export const imports = pgTable(
+  "imports",
+  {
+    id: serial("id").primaryKey(),
+    sourceId: integer("source_id")
+      .notNull()
+      .references(() => gameSources.id),
+    filename: text("filename").notNull(),
+    parsedCount: integer("parsed_count").notNull(),
+    parseErrorCount: integer("parse_error_count").notNull(),
+    importedCount: integer("imported_count").default(0).notNull(),
+    persistenceErrorCount: integer("persistence_error_count").default(0).notNull(),
+    unresolvedSideCount: integer("unresolved_side_count").default(0).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("imports_source_created_at_idx").on(table.sourceId, table.createdAt),
+    check("imports_filename_not_blank", sql`char_length(btrim(${table.filename})) > 0`),
+    check(
+      "imports_counts_nonnegative",
+      sql`${table.parsedCount} >= 0 and ${table.parseErrorCount} >= 0 and ${table.importedCount} >= 0 and ${table.persistenceErrorCount} >= 0 and ${table.unresolvedSideCount} >= 0`,
+    ),
+  ],
+);
+
+export const importGameItems = pgTable(
+  "import_game_items",
+  {
+    id: serial("id").primaryKey(),
+    importId: integer("import_id")
+      .notNull()
+      .references(() => imports.id, { onDelete: "cascade" }),
+    gameId: integer("game_id")
+      .notNull()
+      .references(() => games.id),
+    sourceIndex: integer("source_index").notNull(),
+    originalPgn: text("original_pgn").notNull(),
+    rawTags: jsonb("raw_tags").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("import_game_items_import_id_idx").on(table.importId),
+    index("import_game_items_game_id_idx").on(table.gameId),
+    check("import_game_items_source_index_positive", sql`${table.sourceIndex} >= 1`),
+    check(
+      "import_game_items_original_pgn_not_blank",
+      sql`char_length(btrim(${table.originalPgn})) > 0`,
     ),
   ],
 );

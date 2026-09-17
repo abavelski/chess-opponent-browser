@@ -1,10 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 
-import { previewPgnImport, type ImportPreviewActionState } from "./actions";
+import {
+  confirmPgnImport,
+  previewPgnImport,
+  type ImportConfirmActionState,
+  type ImportPreviewActionState,
+} from "./actions";
 
-const initialState: ImportPreviewActionState = {
+const initialPreviewState: ImportPreviewActionState = {
   status: "idle",
   message: null,
   sourceLabel: "Manual",
@@ -17,6 +23,19 @@ const initialState: ImportPreviewActionState = {
   rawPgn: null,
 };
 
+const initialConfirmState: ImportConfirmActionState = {
+  status: "idle",
+  message: null,
+  importId: null,
+  parsedCount: 0,
+  importedCount: 0,
+  parseErrorCount: 0,
+  persistenceErrorCount: 0,
+  unresolvedSideCount: 0,
+  persistenceErrors: [],
+  affectedPlayers: [],
+};
+
 function ratingLabel(rating: number | null) {
   return rating ? ` (${rating})` : "";
 }
@@ -26,8 +45,137 @@ function openingLabel(eco: string | null, opening: string | null) {
   return eco ?? opening ?? "—";
 }
 
+function ConfirmImportForm({ preview }: { preview: ImportPreviewActionState }) {
+  const [result, action, pending] = useActionState(confirmPgnImport, initialConfirmState);
+  const completed = result.status === "result";
+  const totalErrors = result.parseErrorCount + result.persistenceErrorCount;
+
+  return (
+    <div className="import-confirm-stack">
+      <section className="panel import-confirm-panel" aria-labelledby="confirm-import-heading">
+        <div>
+          <p className="eyebrow">Confirmation</p>
+          <h3 id="confirm-import-heading">Ready to import</h3>
+        </div>
+
+        <dl className="import-confirm-details">
+          <div>
+            <dt>File</dt>
+            <dd>{preview.filename}</dd>
+          </div>
+          <div>
+            <dt>Source</dt>
+            <dd>{preview.sourceLabel}</dd>
+          </div>
+          <div>
+            <dt>Games to import</dt>
+            <dd>{preview.parsedCount}</dd>
+          </div>
+          <div>
+            <dt>Parse errors skipped</dt>
+            <dd>{preview.errorCount}</dd>
+          </div>
+        </dl>
+
+        <p className="helper-text">
+          Only successfully parsed games will be saved. Unknown or ambiguous player identities are
+          preserved as unresolved sides rather than guessed. Duplicate detection arrives in Task 008,
+          so do not intentionally import the same file twice yet.
+        </p>
+
+        <form action={action}>
+          <input name="filename" type="hidden" value={preview.filename ?? ""} />
+          <input name="sourceLabel" type="hidden" value={preview.sourceLabel} />
+          <input name="rawPgn" type="hidden" value={preview.rawPgn ?? ""} />
+
+          {result.status === "error" && result.message ? (
+            <p className="form-error import-confirm-error" role="alert">
+              {result.message}
+            </p>
+          ) : null}
+
+          <div className="form-actions">
+            <button className="button" disabled={pending || completed} type="submit">
+              {pending ? "Importing…" : completed ? "Imported" : "Confirm import"}
+            </button>
+          </div>
+        </form>
+      </section>
+
+      {completed ? (
+        <section className="section-stack import-result-section" aria-labelledby="import-result-heading">
+          <div>
+            <p className="eyebrow">Import result</p>
+            <h2 id="import-result-heading">Import complete</h2>
+          </div>
+
+          {result.message ? (
+            <p className="panel import-notice" role="status">
+              {result.message} Import #{result.importId}.
+            </p>
+          ) : null}
+
+          <dl className="import-summary import-result-summary">
+            <div className="panel">
+              <dt>Parsed</dt>
+              <dd>{result.parsedCount}</dd>
+            </div>
+            <div className="panel">
+              <dt>Imported</dt>
+              <dd>{result.importedCount}</dd>
+            </div>
+            <div className="panel">
+              <dt>Errors</dt>
+              <dd>{totalErrors}</dd>
+            </div>
+            <div className="panel">
+              <dt>Unresolved sides</dt>
+              <dd>{result.unresolvedSideCount}</dd>
+            </div>
+          </dl>
+
+          {result.persistenceErrors.length > 0 ? (
+            <div className="panel import-errors" role="alert">
+              <h3>Games that could not be saved</h3>
+              <ul>
+                {result.persistenceErrors.map((error) => (
+                  <li key={`${error.index}:${error.message}`}>
+                    <strong>Game {error.index}:</strong> {error.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {result.affectedPlayers.length > 0 ? (
+            <div className="panel import-affected-players">
+              <h3>Verify imported games</h3>
+              <p className="muted">
+                These safely matched players are already in tournament rosters. Open one to verify
+                the new game in the normal browse/filter/viewer flow.
+              </p>
+              <ul>
+                {result.affectedPlayers.map((player) => (
+                  <li key={`${player.tournamentId}:${player.playerId}`}>
+                    <Link
+                      className="text-link"
+                      href={`/tournaments/${player.tournamentId}/players/${player.playerId}`}
+                    >
+                      {player.playerName} · {player.tournamentName} →
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
 export function ImportForm() {
-  const [state, action, pending] = useActionState(previewPgnImport, initialState);
+  const [state, action, pending] = useActionState(previewPgnImport, initialPreviewState);
 
   return (
     <div className="import-stack">
@@ -35,8 +183,8 @@ export function ImportForm() {
         <p className="eyebrow">Administrator</p>
         <h1>Import games</h1>
         <p className="muted">
-          Upload one PGN file to inspect how its games will be parsed. Previewing does not save
-          players, games, sources, or tournament data.
+          Upload one PGN file, review the parsed games, then explicitly confirm before anything is
+          saved.
         </p>
 
         <form action={action} className="stack-form">
@@ -61,7 +209,9 @@ export function ImportForm() {
               required
               type="file"
             />
-            <p className="helper-text">One text .pgn file, maximum 3 MB. Multi-game files are supported.</p>
+            <p className="helper-text">
+              One text .pgn file, maximum 3 MB. Multi-game files are supported.
+            </p>
           </div>
 
           {state.status === "error" && state.message ? (
@@ -102,14 +252,14 @@ export function ImportForm() {
               <dd>{state.parsedCount}</dd>
             </div>
             <div className="panel">
-              <dt>Errors</dt>
+              <dt>Parse errors</dt>
               <dd>{state.errorCount}</dd>
             </div>
           </dl>
 
           {state.errors.length > 0 ? (
             <div className="panel import-errors" role="alert">
-              <h3>Games needing attention</h3>
+              <h3>Games skipped during parsing</h3>
               <ul>
                 {state.errors.map((error) => (
                   <li key={`${error.index}:${error.message}`}>
@@ -149,6 +299,13 @@ export function ImportForm() {
                 </li>
               ))}
             </ol>
+          ) : null}
+
+          {state.parsedCount > 0 && state.rawPgn ? (
+            <ConfirmImportForm
+              key={`${state.filename}:${state.sourceLabel}:${state.rawPgn.length}`}
+              preview={state}
+            />
           ) : null}
         </section>
       ) : null}
