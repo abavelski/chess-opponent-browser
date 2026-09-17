@@ -9,6 +9,7 @@ import {
   gameSources,
   importErrors,
   imports as importRecords,
+  playerAliases,
   players,
   tournamentParticipants,
   tournaments,
@@ -37,90 +38,38 @@ async function saveGameUnit(input: SaveImportedGameUnit): Promise<SaveImportedGa
   const movesJson = JSON.stringify(input.game.structuredMoves);
   const tagsJson = JSON.stringify(input.game.tags);
 
-  // The unique duplicate_fingerprint index makes this UPSERT race-safe. On a
-  // conflict we keep the established Game metadata, fill only previously-null
-  // conservative canonical links/FIDE IDs, and attach this import's provenance
-  // to the winning Game row.
   const result = await db.execute(sql`
     with upserted_game as (
       insert into "games" (
-        "white_player_id",
-        "black_player_id",
-        "white_name",
-        "black_name",
-        "white_rating",
-        "black_rating",
-        "white_fide_id",
-        "black_fide_id",
-        "played_on",
-        "result",
-        "event",
-        "site",
-        "round",
-        "eco",
-        "opening",
-        "source_id",
-        "source_game_key",
-        "duplicate_fingerprint",
-        "original_pgn",
-        "structured_moves"
+        "white_player_id", "black_player_id", "white_name", "black_name",
+        "white_rating", "black_rating", "white_fide_id", "black_fide_id",
+        "played_on", "result", "event", "site", "round", "eco", "opening",
+        "source_id", "source_game_key", "duplicate_fingerprint", "original_pgn", "structured_moves"
       ) values (
-        ${input.whitePlayerId},
-        ${input.blackPlayerId},
-        ${input.game.white},
-        ${input.game.black},
-        ${input.game.whiteRating},
-        ${input.game.blackRating},
-        ${storableFideId(input.game.whiteFideId)},
-        ${storableFideId(input.game.blackFideId)},
-        ${input.game.playedOn},
-        ${input.game.result},
-        ${input.game.event},
-        ${input.game.site},
-        ${input.game.round},
-        ${input.game.eco},
-        ${input.game.opening},
-        ${input.sourceId},
-        null,
-        ${input.fingerprint},
-        ${input.game.originalPgn},
-        ${movesJson}::jsonb
+        ${input.whitePlayerId}, ${input.blackPlayerId}, ${input.game.white}, ${input.game.black},
+        ${input.game.whiteRating}, ${input.game.blackRating},
+        ${storableFideId(input.game.whiteFideId)}, ${storableFideId(input.game.blackFideId)},
+        ${input.game.playedOn}, ${input.game.result}, ${input.game.event}, ${input.game.site},
+        ${input.game.round}, ${input.game.eco}, ${input.game.opening}, ${input.sourceId}, null,
+        ${input.fingerprint}, ${input.game.originalPgn}, ${movesJson}::jsonb
       )
       on conflict ("duplicate_fingerprint") do update set
         "white_player_id" = coalesce("games"."white_player_id", excluded."white_player_id"),
         "black_player_id" = coalesce("games"."black_player_id", excluded."black_player_id"),
         "white_fide_id" = coalesce("games"."white_fide_id", excluded."white_fide_id"),
         "black_fide_id" = coalesce("games"."black_fide_id", excluded."black_fide_id")
-      returning
-        "id",
-        "white_player_id",
-        "black_player_id",
-        (xmax = 0) as "inserted"
+      returning "id", "white_player_id", "black_player_id", (xmax = 0) as "inserted"
     ),
     inserted_item as (
       insert into "import_game_items" (
-        "import_id",
-        "game_id",
-        "source_index",
-        "original_pgn",
-        "raw_tags",
-        "outcome"
+        "import_id", "game_id", "source_index", "original_pgn", "raw_tags", "outcome"
       )
-      select
-        ${input.importId},
-        "id",
-        ${input.game.index},
-        ${input.game.originalPgn},
-        ${tagsJson}::jsonb,
-        case when "inserted" then 'imported' else 'duplicate' end
+      select ${input.importId}, "id", ${input.game.index}, ${input.game.originalPgn},
+        ${tagsJson}::jsonb, case when "inserted" then 'imported' else 'duplicate' end
       from upserted_game
       returning "game_id", "outcome"
     )
-    select
-      u."id" as "game_id",
-      i."outcome",
-      u."white_player_id",
-      u."black_player_id"
+    select u."id" as "game_id", i."outcome", u."white_player_id", u."black_player_id"
     from upserted_game u
     inner join inserted_item i on i."game_id" = u."id"
   `);
@@ -181,6 +130,12 @@ export function createImportPersistenceRepository(): ImportPersistenceRepository
       return getDb()
         .select({ id: players.id, name: players.name, fideId: players.fideId })
         .from(players);
+    },
+
+    async listPlayerAliases() {
+      return getDb()
+        .select({ playerId: playerAliases.playerId, normalizedKey: playerAliases.normalizedKey })
+        .from(playerAliases);
     },
 
     async createImport(input) {
