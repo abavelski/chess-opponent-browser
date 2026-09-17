@@ -10,7 +10,7 @@ function first(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-export default async function UnresolvedIdentitiesPage({
+export default async function UnresolvedPlayersPage({
   searchParams,
 }: {
   searchParams: SearchParams;
@@ -26,7 +26,7 @@ export default async function UnresolvedIdentitiesPage({
   try {
     groups = await listUnresolvedIdentityGroups(query);
   } catch (error) {
-    console.error("Failed to load unresolved identities", error);
+    console.error("Failed to load unresolved players", error);
     loadError = true;
   }
 
@@ -39,7 +39,7 @@ export default async function UnresolvedIdentitiesPage({
       <header className="page-header">
         <div>
           <p className="eyebrow">Administrator</p>
-          <h1>Unresolved identities</h1>
+          <h1>Unresolved players</h1>
           <p className="muted page-intro">
             Review imported player names that were intentionally left unlinked rather than guessed.
           </p>
@@ -70,18 +70,18 @@ export default async function UnresolvedIdentitiesPage({
         </div>
         <div className="form-actions">
           <button className="button" type="submit">Search</button>
-          {query ? <Link className="text-link" href="/identities">Clear search</Link> : null}
+          {query ? <Link className="text-link" href="/unresolved-players">Clear search</Link> : null}
         </div>
       </form>
 
       {loadError ? (
         <section className="panel empty-state" role="alert">
-          <h2>Unresolved identities could not be loaded</h2>
+          <h2>Unresolved players could not be loaded</h2>
           <p>Try refreshing the page. If the problem continues, check database health.</p>
         </section>
       ) : groups.length === 0 ? (
         <section className="panel empty-state">
-          <h2>{query ? "No unresolved matches" : "No unresolved identities"}</h2>
+          <h2>{query ? "No unresolved matches" : "No unresolved players"}</h2>
           <p>{query ? "Try a different spelling or clear the search." : "All currently stored game sides are linked to canonical Players."}</p>
         </section>
       ) : (
@@ -96,7 +96,7 @@ export default async function UnresolvedIdentitiesPage({
               if (group.sourceFideId) target.set("fideId", group.sourceFideId);
               return (
                 <li key={`${group.normalizedName}|${group.sourceFideId ?? "-"}`}>
-                  <Link className="panel identity-group-card" href={`/identities/resolve?${target.toString()}`}>
+                  <Link className="panel identity-group-card" href={`/unresolved-players/resolve?${target.toString()}`}>
                     <div className="identity-group-heading">
                       <div>
                         <h3>{group.rawName}</h3>

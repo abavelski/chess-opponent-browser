@@ -17,13 +17,13 @@ function detailUrl(
   const params = new URLSearchParams({ nameKey: normalizedName });
   if (sourceFideId) params.set("fideId", sourceFideId);
   if (error) params.set("error", error);
-  return `/identities/resolve?${params.toString()}`;
+  return `/unresolved-players/resolve?${params.toString()}`;
 }
 
 function resultErrorMessage(status: string) {
   switch (status) {
     case "fide_conflict":
-      return "Resolution blocked because the reviewed source identity conflicts with the target FIDE ID.";
+      return "Resolution blocked because the reviewed source player conflicts with the target FIDE ID.";
     case "alias_conflict":
       return "That normalized alias already belongs to another player. Uncheck Remember alias to make a one-off resolution.";
     case "canonical_fide_conflict":
@@ -31,9 +31,9 @@ function resultErrorMessage(status: string) {
     case "target_missing":
       return "The selected canonical player no longer exists.";
     case "stale":
-      return "This unresolved group changed or was already resolved. Refresh the queue and review it again.";
+      return "This unresolved player group changed or was already resolved. Refresh the queue and review it again.";
     default:
-      return "The identity could not be resolved. Refresh and try again.";
+      return "The player match could not be resolved. Refresh and try again.";
   }
 }
 
@@ -65,7 +65,7 @@ export async function resolveToExistingPlayer(formData: FormData) {
       rememberAlias,
     });
   } catch (error) {
-    console.error("Failed to resolve identity to existing player", error);
+    console.error("Failed to resolve player match to existing player", error);
     redirect(detailUrl(normalizedName, sourceFideId, "The database operation failed. No partial resolution was applied."));
   }
 
@@ -73,7 +73,7 @@ export async function resolveToExistingPlayer(formData: FormData) {
     redirect(detailUrl(normalizedName, sourceFideId, resultErrorMessage(result.status)));
   }
 
-  redirect(`/identities?resolved=${result.updatedCount}&playerId=${result.playerId}`);
+  redirect(`/unresolved-players?resolved=${result.updatedCount}&playerId=${result.playerId}`);
 }
 
 export async function createPlayerAndResolve(formData: FormData) {
@@ -83,7 +83,7 @@ export async function createPlayerAndResolve(formData: FormData) {
   const fideId = formData.get("canonicalFideId");
 
   if (!normalizedName) {
-    redirect("/identities?error=The unresolved identity is invalid.");
+    redirect("/unresolved-players?error=The unresolved player entry is invalid.");
   }
 
   const validation = validateOpponentInput({
@@ -108,7 +108,7 @@ export async function createPlayerAndResolve(formData: FormData) {
       rememberAlias,
     });
   } catch (error) {
-    console.error("Failed to create player during identity resolution", error);
+    console.error("Failed to create player during player resolution", error);
     redirect(detailUrl(normalizedName, sourceFideId, "The database operation failed. No player or partial resolution was created."));
   }
 
@@ -116,5 +116,5 @@ export async function createPlayerAndResolve(formData: FormData) {
     redirect(detailUrl(normalizedName, sourceFideId, resultErrorMessage(result.status)));
   }
 
-  redirect(`/identities?resolved=${result.updatedCount}&playerId=${result.playerId}&created=1`);
+  redirect(`/unresolved-players?resolved=${result.updatedCount}&playerId=${result.playerId}&created=1`);
 }

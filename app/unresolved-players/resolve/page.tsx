@@ -18,7 +18,7 @@ function first(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-export default async function ResolveIdentityPage({
+export default async function ResolvePlayerPage({
   searchParams,
 }: {
   searchParams: SearchParams;
@@ -49,7 +49,7 @@ export default async function ResolveIdentityPage({
           candidate.sourceFideId === sourceFideId,
       ) ?? null;
   } catch (error) {
-    console.error("Failed to load unresolved identity detail", error);
+    console.error("Failed to load unresolved player detail", error);
     loadError = true;
   }
 
@@ -58,13 +58,13 @@ export default async function ResolveIdentityPage({
 
   return (
     <main className="app-shell">
-      <Link className="back-link" href="/identities">
-        ← Unresolved identities
+      <Link className="back-link" href="/unresolved-players">
+        ← Unresolved players
       </Link>
 
       <header className="page-header identity-detail-header">
         <div>
-          <p className="eyebrow">Identity review</p>
+          <p className="eyebrow">Player review</p>
           <h1>{rawName || "Unresolved player"}</h1>
           <p className="muted page-intro">
             Normalized key: <strong>{normalizedName || "—"}</strong>
@@ -78,14 +78,14 @@ export default async function ResolveIdentityPage({
 
       {loadError ? (
         <section className="panel empty-state" role="alert">
-          <h2>Identity detail could not be loaded</h2>
-          <p>Refresh and try again. No identity changes were applied.</p>
+          <h2>Player details could not be loaded</h2>
+          <p>Refresh and try again. No player changes were applied.</p>
         </section>
       ) : !group || sideCount === 0 ? (
         <section className="panel empty-state">
-          <h2>This identity is no longer unresolved</h2>
+          <h2>This player group is no longer unresolved</h2>
           <p>It may already have been resolved in another session.</p>
-          <Link className="text-link" href="/identities">Return to unresolved identities →</Link>
+          <Link className="text-link" href="/unresolved-players">Return to unresolved players →</Link>
         </section>
       ) : (
         <>
