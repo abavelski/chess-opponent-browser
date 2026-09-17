@@ -29,6 +29,13 @@
       "when": 1789587000000,
       "tag": "0003_browse_seeded_games",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789621200000,
+      "tag": "0004_persist_pgn_imports",
+      "breakpoints": true
     }
   ]
 }
