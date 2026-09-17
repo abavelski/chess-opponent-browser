@@ -161,7 +161,8 @@
       "compositePrimaryKeys": {}, "uniqueConstraints": {}, "policies": {},
       "checkConstraints": {
         "imports_filename_not_blank": {"name": "imports_filename_not_blank", "value": "char_length(btrim(\"imports\".\"filename\")) > 0"},
-        "imports_counts_nonnegative": {"name": "imports_counts_nonnegative", "value": "\"imports\".\"parsed_count\" >= 0 and \"imports\".\"parse_error_count\" >= 0 and \"imports\".\"imported_count\" >= 0 and \"imports\".\"duplicate_count\" >= 0 and \"imports\".\"persistence_error_count\" >= 0 and \"imports\".\"unresolved_side_count\" >= 0"},
+        "imports_counts_nonnegative": {"name": "imports_counts_nonnegative", "value": "\"imports\".\"parsed_count\" >= 0 and \"imports\".\"parse_error_count\" >= 0 and \"imports\".\"imported_count\" >= 0 and \"imports\".\"persistence_error_count\" >= 0 and \"imports\".\"unresolved_side_count\" >= 0"},
+        "imports_duplicate_count_nonnegative": {"name": "imports_duplicate_count_nonnegative", "value": "\"imports\".\"duplicate_count\" >= 0"},
         "imports_status_valid": {"name": "imports_status_valid", "value": "\"imports\".\"status\" in ('processing', 'completed', 'completed_with_errors', 'failed')"}
       },
       "isRLSEnabled": false
