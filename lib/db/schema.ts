@@ -189,8 +189,9 @@ export const imports = pgTable(
     check("imports_filename_not_blank", sql`char_length(btrim(${table.filename})) > 0`),
     check(
       "imports_counts_nonnegative",
-      sql`${table.parsedCount} >= 0 and ${table.parseErrorCount} >= 0 and ${table.importedCount} >= 0 and ${table.duplicateCount} >= 0 and ${table.persistenceErrorCount} >= 0 and ${table.unresolvedSideCount} >= 0`,
+      sql`${table.parsedCount} >= 0 and ${table.parseErrorCount} >= 0 and ${table.importedCount} >= 0 and ${table.persistenceErrorCount} >= 0 and ${table.unresolvedSideCount} >= 0`,
     ),
+    check("imports_duplicate_count_nonnegative", sql`${table.duplicateCount} >= 0`),
     check(
       "imports_status_valid",
       sql`${table.status} in ('processing', 'completed', 'completed_with_errors', 'failed')`,
