@@ -5,6 +5,8 @@ import {
   parsePgnPreview,
   validatePgnUploadMetadata,
 } from "@/lib/imports/pgn";
+import { persistParsedImport } from "@/lib/imports/persist";
+import { createImportPersistenceRepository } from "@/lib/imports/repository";
 
 export type ImportPreviewListItem = {
   index: number;
@@ -32,7 +34,25 @@ export type ImportPreviewActionState = {
   rawPgn: string | null;
 };
 
-function errorState(message: string, sourceLabel: string): ImportPreviewActionState {
+export type ImportConfirmActionState = {
+  status: "idle" | "error" | "result";
+  message: string | null;
+  importId: number | null;
+  parsedCount: number;
+  importedCount: number;
+  parseErrorCount: number;
+  persistenceErrorCount: number;
+  unresolvedSideCount: number;
+  persistenceErrors: Array<{ index: number; message: string }>;
+  affectedPlayers: Array<{
+    playerId: number;
+    playerName: string;
+    tournamentId: number;
+    tournamentName: string;
+  }>;
+};
+
+function previewErrorState(message: string, sourceLabel: string): ImportPreviewActionState {
   return {
     status: "error",
     message,
@@ -47,6 +67,21 @@ function errorState(message: string, sourceLabel: string): ImportPreviewActionSt
   };
 }
 
+function confirmErrorState(message: string): ImportConfirmActionState {
+  return {
+    status: "error",
+    message,
+    importId: null,
+    parsedCount: 0,
+    importedCount: 0,
+    parseErrorCount: 0,
+    persistenceErrorCount: 0,
+    unresolvedSideCount: 0,
+    persistenceErrors: [],
+    affectedPlayers: [],
+  };
+}
+
 export async function previewPgnImport(
   _previousState: ImportPreviewActionState,
   formData: FormData,
@@ -56,7 +91,7 @@ export async function previewPgnImport(
   const uploaded = formData.get("pgnFile");
 
   if (!(uploaded instanceof File)) {
-    return errorState("Choose one PGN file to preview.", sourceLabel);
+    return previewErrorState("Choose one PGN file to preview.", sourceLabel);
   }
 
   const validation = validatePgnUploadMetadata({
@@ -64,18 +99,23 @@ export async function previewPgnImport(
     size: uploaded.size,
     sourceLabel,
   });
-  if (!validation.ok) return errorState(validation.message, sourceLabel);
+  if (!validation.ok) return previewErrorState(validation.message, sourceLabel);
 
-  // The configured Server Action body limit is slightly larger than this product limit.
   if (uploaded.size > MAX_PGN_BYTES) {
-    return errorState("The PGN file is too large. Maximum size is 3 MB.", validation.sourceLabel);
+    return previewErrorState(
+      "The PGN file is too large. Maximum size is 3 MB.",
+      validation.sourceLabel,
+    );
   }
 
   let rawPgn: string;
   try {
     rawPgn = await uploaded.text();
   } catch {
-    return errorState("The selected file could not be read as text.", validation.sourceLabel);
+    return previewErrorState(
+      "The selected file could not be read as text.",
+      validation.sourceLabel,
+    );
   }
 
   try {
@@ -108,6 +148,68 @@ export async function previewPgnImport(
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "The PGN could not be parsed.";
-    return errorState(message, validation.sourceLabel);
+    return previewErrorState(message, validation.sourceLabel);
+  }
+}
+
+export async function confirmPgnImport(
+  _previousState: ImportConfirmActionState,
+  formData: FormData,
+): Promise<ImportConfirmActionState> {
+  const filename = formData.get("filename");
+  const sourceLabel = formData.get("sourceLabel");
+  const rawPgn = formData.get("rawPgn");
+
+  if (
+    typeof filename !== "string" ||
+    typeof sourceLabel !== "string" ||
+    typeof rawPgn !== "string" ||
+    !rawPgn
+  ) {
+    return confirmErrorState("The preview is no longer available. Preview the PGN again.");
+  }
+
+  const byteLength = new TextEncoder().encode(rawPgn).byteLength;
+  const validation = validatePgnUploadMetadata({
+    filename,
+    size: byteLength,
+    sourceLabel,
+  });
+  if (!validation.ok) return confirmErrorState(validation.message);
+
+  try {
+    // Reparse the raw PGN on the server. No parsed move tree or identity decision
+    // submitted by the browser is trusted at the confirmation boundary.
+    const preview = parsePgnPreview(rawPgn);
+    if (preview.games.length === 0) {
+      return confirmErrorState("No successfully parsed games are available to import.");
+    }
+
+    const result = await persistParsedImport(
+      {
+        filename,
+        sourceLabel: validation.sourceLabel,
+        preview,
+      },
+      createImportPersistenceRepository(),
+    );
+
+    return {
+      status: "result",
+      message: "Import complete. Safely matched games are now available in the player browser.",
+      importId: result.importId,
+      parsedCount: result.parsedCount,
+      importedCount: result.importedCount,
+      parseErrorCount: result.parseErrorCount,
+      persistenceErrorCount: result.persistenceErrorCount,
+      unresolvedSideCount: result.unresolvedSideCount,
+      persistenceErrors: result.persistenceErrors,
+      affectedPlayers: result.affectedPlayers,
+    };
+  } catch (error) {
+    console.error("Failed to persist PGN import", error);
+    return confirmErrorState(
+      "The import could not be completed because the database operation failed. Check the game library before retrying.",
+    );
   }
 }
