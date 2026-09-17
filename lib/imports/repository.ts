@@ -41,12 +41,7 @@ async function saveGameUnit(input: SaveImportedGameUnit): Promise<SaveImportedGa
   // conflict we keep the established Game metadata, fill only previously-null
   // conservative canonical links/FIDE IDs, and attach this import's provenance
   // to the winning Game row.
-  const rows = await db.execute(sql<{
-    game_id: number;
-    outcome: "imported" | "duplicate";
-    white_player_id: number | null;
-    black_player_id: number | null;
-  }>`
+  const result = await db.execute(sql`
     with upserted_game as (
       insert into "games" (
         "white_player_id",
@@ -130,7 +125,14 @@ async function saveGameUnit(input: SaveImportedGameUnit): Promise<SaveImportedGa
     inner join inserted_item i on i."game_id" = u."id"
   `);
 
-  const row = rows[0];
+  const row = result.rows[0] as
+    | {
+        game_id: number | string;
+        outcome: "imported" | "duplicate";
+        white_player_id: number | string | null;
+        black_player_id: number | string | null;
+      }
+    | undefined;
   if (!row) throw new Error("Imported game could not be persisted.");
 
   return {
