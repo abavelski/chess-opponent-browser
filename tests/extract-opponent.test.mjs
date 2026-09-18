@@ -94,6 +94,36 @@ describe("local opponent PGN extraction", () => {
     expect(output).not.toContain('[Event "Selected by alias"]');
   });
 
+  it("ends comments whose closing brace follows a backslash", async () => {
+    const { inputPath, outputPath } = await tempFiles();
+    const pgnWithDanbaseAnnotation = String.raw`[Event "Annotated game"]
+[White "Someone Else"]
+[Black "Third Player"]
+[Result "1-0"]
+
+1. e4 {[%cal Re4e5] /\} e5 1-0
+
+[Event "Target game"]
+[White "Bavelski, Nikolaj"]
+[Black "Other Player"]
+[Result "0-1"]
+
+1. d4 d5 0-1
+`;
+    await writeFile(inputPath, pgnWithDanbaseAnnotation, "utf8");
+
+    const summary = await extractOpponentPgn({
+      inputPath,
+      outputPath,
+      names: ["Bavelski, Nikolaj"],
+    });
+    const output = await readFile(outputPath, "utf8");
+
+    expect(summary).toMatchObject({ scanned: 2, matched: 1 });
+    expect(output).toContain('[Event "Target game"]');
+    expect(output).not.toContain('[Event "Annotated game"]');
+  });
+
   it("supports repeatable alias CLI arguments", () => {
     expect(
       parseArguments([

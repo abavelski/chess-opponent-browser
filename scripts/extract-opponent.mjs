@@ -22,17 +22,8 @@ function unescapeTag(value) {
 
 function updateBraceDepth(line, initialDepth) {
   let depth = initialDepth;
-  let escaped = false;
 
   for (const character of line) {
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-    if (character === "\\") {
-      escaped = true;
-      continue;
-    }
     if (character === "{") depth += 1;
     else if (character === "}" && depth > 0) depth -= 1;
   }
