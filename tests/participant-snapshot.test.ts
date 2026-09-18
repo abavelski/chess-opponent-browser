@@ -5,6 +5,8 @@ import { parseParticipantSnapshot } from "@/lib/participants/snapshot";
 describe("parseParticipantSnapshot", () => {
   it("normalizes a valid local participant snapshot", () => {
     expect(parseParticipantSnapshot({
+      tournamentNickname: "furesoe-open",
+      participantGroup: "U-14",
       sourceUrl: "https://turnering.skak.dk/example",
       extractedAt: "2026-09-18T10:00:00Z",
       ratingsUpdatedAt: null,
@@ -22,7 +24,11 @@ describe("parseParticipantSnapshot", () => {
         dsuProfileUrl: "https://rating.skak.dk/1234",
         fideProfileUrl: "https://ratings.fide.com/profile/1500000",
       }],
-    }).players[0]).toMatchObject({ name: "Player One", actualDsuRating: 1912 });
+    })).toMatchObject({
+      tournamentNickname: "furesoe-open",
+      participantGroup: "U-14",
+      players: [expect.objectContaining({ name: "Player One", actualDsuRating: 1912 })],
+    });
   });
 
   it("rejects invalid ratings and duplicate federation ids", () => {

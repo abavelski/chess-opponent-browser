@@ -27,8 +27,10 @@ export const tournaments = pgTable(
   {
     id: serial("id").primaryKey(),
     name: varchar("name", { length: 200 }).notNull(),
+    nickname: varchar("nickname", { length: 80 }).notNull().unique(),
     isActive: boolean("is_active").default(false).notNull(),
     sourceUrl: text("source_url"),
+    participantGroup: varchar("participant_group", { length: 120 }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
@@ -36,6 +38,11 @@ export const tournaments = pgTable(
       .on(table.isActive)
       .where(sql`${table.isActive} = true`),
     check("tournaments_name_not_blank", sql`char_length(btrim(${table.name})) > 0`),
+    check("tournaments_nickname_format", sql`${table.nickname} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`),
+    check(
+      "tournaments_participant_group_not_blank",
+      sql`${table.participantGroup} is null or char_length(btrim(${table.participantGroup})) > 0`,
+    ),
   ],
 );
 

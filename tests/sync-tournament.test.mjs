@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { danbaseNameVariants, identityKeys, mergeParticipants, parseArguments, toRating } from "../scripts/sync-tournament.mjs";
+import { danbaseNameVariants, filterParticipantsByGroup, identityKeys, mergeParticipants, parseArguments, toRating } from "../scripts/sync-tournament.mjs";
 
 describe("tournament sync CLI", () => {
   it("uses the local Danbase path and local snapshot defaults", () => {
@@ -12,8 +12,14 @@ describe("tournament sync CLI", () => {
   });
 
   it("parses subcommands and overrides", () => {
-    expect(parseArguments(["app", "--file", "other.json", "--app-url", "http://localhost:3000"]))
-      .toMatchObject({ command: "app", snapshotPath: "other.json", appUrl: "http://localhost:3000" });
+    expect(parseArguments(["app", "furesoe-open", "--file", "other.json", "--app-url", "http://localhost:3000"]))
+      .toMatchObject({ command: "app", nickname: "furesoe-open", snapshotPath: "other.json", appUrl: "http://localhost:3000" });
+  });
+
+  it("filters participant groups case-insensitively", () => {
+    const players = [{ name: "One", group: " U-14 " }, { name: "Two", group: "Open" }];
+    expect(filterParticipantsByGroup(players, "u-14")).toEqual([players[0]]);
+    expect(filterParticipantsByGroup(players, null)).toEqual(players);
   });
 
   it("preserves refreshed ratings while replacing the roster", () => {

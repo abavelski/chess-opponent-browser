@@ -6,27 +6,35 @@ import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { tournaments } from "@/lib/db/schema";
 import {
-  type TournamentNameErrorCode,
-  validateTournamentName,
+  type TournamentDetailsErrorCode,
+  validateTournamentDetails,
 } from "@/lib/tournaments/validation";
 
-type CreateTournamentErrorCode = TournamentNameErrorCode | "database";
+type CreateTournamentErrorCode = TournamentDetailsErrorCode | "database";
 
 function redirectToForm(
   error: CreateTournamentErrorCode,
-  name: string,
+  values: Record<string, string>,
 ): never {
-  const params = new URLSearchParams({ error, name });
+  const params = new URLSearchParams({ error, ...values });
   redirect(`/tournaments/new?${params.toString()}`);
 }
 
 export async function createTournament(formData: FormData) {
-  const rawName = formData.get("name");
-  const enteredName = typeof rawName === "string" ? rawName : "";
-  const validation = validateTournamentName(rawName);
+  const textValue = (key: string) => {
+    const value = formData.get(key);
+    return typeof value === "string" ? value : "";
+  };
+  const entered = {
+    name: textValue("name"),
+    nickname: textValue("nickname"),
+    sourceUrl: textValue("sourceUrl"),
+    participantGroup: textValue("participantGroup"),
+  };
+  const validation = validateTournamentDetails(entered);
 
   if (!validation.success) {
-    redirectToForm(validation.error, enteredName);
+    redirectToForm(validation.error, entered);
   }
 
   let tournamentId: number;
@@ -34,7 +42,7 @@ export async function createTournament(formData: FormData) {
   try {
     const [createdTournament] = await getDb()
       .insert(tournaments)
-      .values({ name: validation.name })
+      .values(validation.details)
       .returning({ id: tournaments.id });
 
     if (!createdTournament) {
@@ -44,7 +52,7 @@ export async function createTournament(formData: FormData) {
     tournamentId = createdTournament.id;
   } catch (error) {
     console.error("Failed to create tournament", error);
-    redirectToForm("database", enteredName);
+    redirectToForm("database", entered);
   }
 
   revalidatePath("/");

@@ -82,19 +82,19 @@ The tournament sync keeps an authoritative local participant snapshot in `data/p
 Run the complete workflow:
 
 ```bash
-npm run sync-tournament -- --url "https://turnering.skak.dk/TournamentActive/Details?tourId=..."
+npm run sync-tournament -- furesoe-open-2026
 ```
 
 The existing `tourId=30447` URL is the first-run default, and the selected URL is saved in the local snapshot, so later runs only need:
 
 ```bash
-npm run sync-tournament
+npm run sync-tournament -- furesoe-open-2026
 ```
 
 Individual stages are also available:
 
 ```bash
-npm run sync-participants # refresh additions/removals from the tournament site
+npm run sync-participants -- furesoe-open-2026 # refresh additions/removals from the saved URL/group
 npm run sync-ratings      # refresh both DSU and FIDE ratings in the local file
 npm run sync-dsu
 npm run sync-fide
@@ -102,7 +102,7 @@ npm run sync-app          # reconcile the local file with the active app tournam
 npm run sync-games        # scan Danbase once, then upload one pack per participant
 ```
 
-Defaults are `C:\dev\danbase.pgn`, `data/participants.json`, `packs/`, and the Production app URL. Override them with `--danbase`, `--file`, `--packs-dir`, and `--app-url`. New tournaments are inactive; use **Make active** on `/admin` before syncing one. Only one tournament can be active.
+The nickname fetches the tournament URL and optional participant group from the app. A group-filtered sync reconciles the roster, removing participants outside that group while preserving global players and games. Defaults are `C:\dev\danbase.pgn`, `data/participants.json`, `packs/`, and the Production app URL. Override them with `--url`, `--danbase`, `--file`, `--packs-dir`, and `--app-url`. New tournaments are inactive; use **Make active** on `/admin` before syncing one. Only the active tournament can be synced.
 
 If Danbase uses an older spelling for a player, add a local `danbaseAliases` array to that player in the snapshot. Participant refreshes preserve this local field.
 

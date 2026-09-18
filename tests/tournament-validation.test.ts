@@ -4,6 +4,7 @@ import {
   TOURNAMENT_NAME_MAX_LENGTH,
   parseTournamentId,
   validateTournamentName,
+  validateTournamentDetails,
 } from "../lib/tournaments/validation";
 
 describe("validateTournamentName", () => {
@@ -41,6 +42,40 @@ describe("validateTournamentName", () => {
       success: false,
       error: "required",
     });
+  });
+});
+
+describe("validateTournamentDetails", () => {
+  it("normalizes complete tournament sync details", () => {
+    expect(validateTournamentDetails({
+      name: " Furesoe Open ",
+      nickname: "Furesoe-Open",
+      sourceUrl: " https://turnering.skak.dk/tournament ",
+      participantGroup: " U-14 ",
+    })).toEqual({
+      success: true,
+      details: {
+        name: "Furesoe Open",
+        nickname: "furesoe-open",
+        sourceUrl: "https://turnering.skak.dk/tournament",
+        participantGroup: "U-14",
+      },
+    });
+  });
+
+  it("rejects invalid nicknames and URLs", () => {
+    expect(validateTournamentDetails({
+      name: "Tournament",
+      nickname: "not valid",
+      sourceUrl: "https://example.com",
+      participantGroup: "",
+    })).toMatchObject({ success: false, error: "nickname_format" });
+    expect(validateTournamentDetails({
+      name: "Tournament",
+      nickname: "valid",
+      sourceUrl: "file:///tournament",
+      participantGroup: "",
+    })).toMatchObject({ success: false, error: "url_invalid" });
   });
 });
 

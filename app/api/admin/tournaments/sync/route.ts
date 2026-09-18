@@ -24,12 +24,26 @@ export async function POST(request: Request) {
   try {
     const db = getDb();
     const [activeTournament] = await db
-      .select({ id: tournaments.id, name: tournaments.name })
+      .select({ id: tournaments.id, name: tournaments.name, nickname: tournaments.nickname })
       .from(tournaments)
-      .where(eq(tournaments.isActive, true))
+      .where(
+        snapshot.tournamentNickname
+          ? and(
+              eq(tournaments.isActive, true),
+              eq(tournaments.nickname, snapshot.tournamentNickname),
+            )
+          : eq(tournaments.isActive, true),
+      )
       .limit(1);
 
-    if (!activeTournament) return errorResponse("No active tournament exists.", 409);
+    if (!activeTournament) {
+      return errorResponse(
+        snapshot.tournamentNickname
+          ? `Tournament '${snapshot.tournamentNickname}' is not active.`
+          : "No active tournament exists.",
+        409,
+      );
+    }
 
     const [canonicalPlayers, aliases, currentRoster] = await Promise.all([
       db.select().from(players),
@@ -142,8 +156,11 @@ export async function POST(request: Request) {
       removed = deleted.length;
     }
 
-    if (snapshot.sourceUrl) {
-      await db.update(tournaments).set({ sourceUrl: snapshot.sourceUrl })
+    if (snapshot.sourceUrl || snapshot.participantGroup !== null) {
+      await db.update(tournaments).set({
+        ...(snapshot.sourceUrl ? { sourceUrl: snapshot.sourceUrl } : {}),
+        participantGroup: snapshot.participantGroup,
+      })
         .where(eq(tournaments.id, activeTournament.id));
     }
 

@@ -1,20 +1,60 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { getDb } from "@/lib/db";
 import { games, players, tournamentParticipants, tournaments } from "@/lib/db/schema";
 import { parseTournamentId } from "@/lib/tournaments/validation";
+import {
+  nextRosterSortOrder,
+  parseRosterSort,
+  type RosterSortKey,
+  type RosterSortOrder,
+} from "@/lib/tournaments/roster-sort";
 
 export const dynamic = "force-dynamic";
 
 type TournamentPageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ sort?: string; order?: string }>;
 };
 
-export default async function TournamentPage({ params }: TournamentPageProps) {
-  const { id: rawId } = await params;
+function SortableHeader({
+  label,
+  column,
+  numeric = false,
+  tournamentId,
+  currentSort,
+  currentOrder,
+}: {
+  label: string;
+  column: RosterSortKey;
+  numeric?: boolean;
+  tournamentId: number;
+  currentSort: RosterSortKey;
+  currentOrder: RosterSortOrder;
+}) {
+  const active = currentSort === column;
+  const nextOrder = nextRosterSortOrder(column, currentSort, currentOrder);
+  return (
+    <th
+      aria-sort={active ? (currentOrder === "asc" ? "ascending" : "descending") : "none"}
+      className={numeric ? "numeric-cell" : undefined}
+    >
+      <Link
+        className="sortable-header-link"
+        href={`/tournaments/${tournamentId}?sort=${column}&order=${nextOrder}`}
+      >
+        {label}{active ? (currentOrder === "asc" ? " ↑" : " ↓") : ""}
+      </Link>
+    </th>
+  );
+}
+
+export default async function TournamentPage({ params, searchParams }: TournamentPageProps) {
+  const [{ id: rawId }, rawSort] = await Promise.all([params, searchParams]);
   const tournamentId = parseTournamentId(rawId);
+  const { sort, order } = parseRosterSort(rawSort.sort, rawSort.order);
 
   if (tournamentId === null) {
     notFound();
@@ -41,6 +81,22 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       .limit(1);
 
     if (tournament) {
+      const gameCount = sql<number>`(
+        select count(*) from ${games}
+        where ${games.whitePlayerId} = ${players.id} or ${games.blackPlayerId} = ${players.id}
+      )`;
+      const sortExpressions = {
+        name: players.name,
+        club: tournamentParticipants.club,
+        group: tournamentParticipants.groupName,
+        dsu: players.currentDsuRating,
+        fide: players.currentFideRating,
+        games: gameCount,
+      };
+      const primaryOrder = order === "asc"
+        ? sql`${sortExpressions[sort]} asc nulls last`
+        : sql`${sortExpressions[sort]} desc nulls last`;
+
       roster = await db
         .select({
           playerId: players.id,
@@ -49,15 +105,12 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
           group: tournamentParticipants.groupName,
           dsuRating: players.currentDsuRating,
           fideRating: players.currentFideRating,
-          gameCount: sql<number>`(
-            select count(*) from ${games}
-            where ${games.whitePlayerId} = ${players.id} or ${games.blackPlayerId} = ${players.id}
-          )`,
+          gameCount,
         })
         .from(tournamentParticipants)
         .innerJoin(players, eq(tournamentParticipants.playerId, players.id))
         .where(eq(tournamentParticipants.tournamentId, tournamentId))
-        .orderBy(desc(players.currentDsuRating), desc(players.currentFideRating), players.name);
+        .orderBy(primaryOrder, players.name);
     }
   } catch (error) {
     console.error("Failed to load tournament roster", error);
@@ -86,12 +139,12 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
           <table className="opponent-table">
             <thead>
               <tr>
-                <th>Player</th>
-                <th>Club</th>
-                <th>Group</th>
-                <th className="numeric-cell">DSU</th>
-                <th className="numeric-cell">FIDE</th>
-                <th className="numeric-cell">Games</th>
+                <SortableHeader label="Player" column="name" tournamentId={tournament.id} currentSort={sort} currentOrder={order} />
+                <SortableHeader label="Club" column="club" tournamentId={tournament.id} currentSort={sort} currentOrder={order} />
+                <SortableHeader label="Group" column="group" tournamentId={tournament.id} currentSort={sort} currentOrder={order} />
+                <SortableHeader label="DSU" column="dsu" numeric tournamentId={tournament.id} currentSort={sort} currentOrder={order} />
+                <SortableHeader label="FIDE" column="fide" numeric tournamentId={tournament.id} currentSort={sort} currentOrder={order} />
+                <SortableHeader label="Games" column="games" numeric tournamentId={tournament.id} currentSort={sort} currentOrder={order} />
               </tr>
             </thead>
             <tbody>

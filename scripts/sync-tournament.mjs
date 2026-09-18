@@ -67,6 +67,7 @@ export function mergeParticipants(existing, fresh) {
 export function parseArguments(argv) {
   const options = {
     command: "all",
+    nickname: "",
     snapshotPath: DEFAULT_SNAPSHOT,
     tournamentUrl: "",
     danbasePath: DEFAULT_DANBASE,
@@ -94,6 +95,8 @@ export function parseArguments(argv) {
       else if (argument === "--app-url") options.appUrl = value;
       else if (argument === "--packs-dir") options.packsDir = value;
       else options.throttleMs = Number(value);
+    } else if (!argument.startsWith("-") && !options.nickname) {
+      options.nickname = argument.trim().toLowerCase();
     } else throw new Error(`Unknown argument: ${argument}`);
   }
 
@@ -101,6 +104,30 @@ export function parseArguments(argv) {
     throw new Error("--throttle must be a non-negative number.");
   }
   return options;
+}
+
+export function filterParticipantsByGroup(players, participantGroup) {
+  if (!participantGroup) return players;
+  const normalize = (value) => String(value ?? "").normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
+  const expected = normalize(participantGroup);
+  return players.filter((player) => normalize(player.group) === expected);
+}
+
+export async function fetchTournamentConfig(options) {
+  const endpoint = new URL("/api/admin/tournaments/config", options.appUrl);
+  if (options.nickname) endpoint.searchParams.set("nickname", options.nickname);
+  const response = await fetch(endpoint);
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || !payload?.ok) {
+    throw new Error(payload?.message || `Tournament configuration failed with HTTP ${response.status}.`);
+  }
+  if (!payload.tournament.isActive) {
+    throw new Error(`Tournament '${payload.tournament.nickname}' is not active. Make it active in Admin before syncing.`);
+  }
+  if (!payload.tournament.sourceUrl && !options.tournamentUrl) {
+    throw new Error(`Tournament '${payload.tournament.nickname}' has no source URL.`);
+  }
+  return payload.tournament;
 }
 
 export async function readSnapshot(filePath) {
@@ -206,13 +233,28 @@ async function extractAllParticipants(page) {
 
 export async function refreshParticipants(options) {
   const previous = await readSnapshot(options.snapshotPath).catch(() => ({ players: [], sourceUrl: null }));
-  const sourceUrl = options.tournamentUrl || previous.sourceUrl || DEFAULT_TOURNAMENT_URL;
+  const tournament = await fetchTournamentConfig(options);
+  const sourceUrl = options.tournamentUrl || tournament.sourceUrl || previous.sourceUrl || DEFAULT_TOURNAMENT_URL;
   const browser = await launchBrowser();
   try {
     const page = await browser.newPage();
     await openParticipantTable(page, sourceUrl);
-    const players = mergeParticipants(previous.players, await extractAllParticipants(page));
-    const snapshot = { version: 1, sourceUrl, extractedAt: new Date().toISOString(), ratingsUpdatedAt: previous.ratingsUpdatedAt ?? null, players };
+    const extracted = await extractAllParticipants(page);
+    const selected = filterParticipantsByGroup(extracted, tournament.participantGroup);
+    if (tournament.participantGroup && selected.length === 0) {
+      const available = [...new Set(extracted.map((player) => player.group).filter(Boolean))].join(", ");
+      throw new Error(`No participants matched group '${tournament.participantGroup}'. Available groups: ${available || "none"}.`);
+    }
+    const players = mergeParticipants(previous.players, selected);
+    const snapshot = {
+      version: 1,
+      tournamentNickname: tournament.nickname,
+      participantGroup: tournament.participantGroup,
+      sourceUrl,
+      extractedAt: new Date().toISOString(),
+      ratingsUpdatedAt: previous.ratingsUpdatedAt ?? null,
+      players,
+    };
     const target = await saveSnapshot(options.snapshotPath, snapshot);
     process.stdout.write(`Saved ${players.length} participants to ${target}.\n`);
     return snapshot;
@@ -281,7 +323,14 @@ export async function refreshRatings(options, types) {
 export async function syncApp(options) {
   const snapshot = await readSnapshot(options.snapshotPath);
   const endpoint = new URL("/api/admin/tournaments/sync", options.appUrl);
-  const response = await fetch(endpoint, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(snapshot) });
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      ...snapshot,
+      tournamentNickname: options.nickname || snapshot.tournamentNickname || null,
+    }),
+  });
   const payload = await response.json().catch(() => null);
   if (!response.ok || !payload?.ok) throw new Error(payload?.message || `App sync failed with HTTP ${response.status}.`);
   const counts = payload.participants;
@@ -331,7 +380,7 @@ export async function syncGames(options) {
 }
 
 function usage() {
-  return `Synchronize a Danish tournament, ratings, and Danbase games.\n\nUsage:\n  npm run sync-tournament -- --url <tournament-url>\n  npm run sync-participants -- --url <tournament-url>\n  npm run sync-ratings\n  npm run sync-app\n  npm run sync-games\n\nCommands: all, participants, dsu, fide, ratings, app, games\nOptions:\n  -f, --file <path>       Local snapshot (default: ${DEFAULT_SNAPSHOT})\n  -u, --url <url>         Danish tournament URL (saved; defaults to tourId 30447)\n      --danbase <path>    Danbase PGN (default: ${DEFAULT_DANBASE})\n      --app-url <url>     Target app (default: OPPONENT_BROWSER_URL or Production)\n      --packs-dir <path>  Local PGN packs (default: packs)\n      --throttle <ms>     Delay between rating pages (default: 2500)\n`;
+  return `Synchronize a Danish tournament, ratings, and Danbase games.\n\nUsage:\n  npm run sync-tournament -- <nickname>\n  npm run sync-participants -- <nickname>\n  npm run sync-ratings -- <nickname>\n  npm run sync-app -- <nickname>\n  npm run sync-games -- <nickname>\n\nThe nickname loads the active tournament URL and optional group from the app.\nOmit it to use the active tournament directly.\n\nCommands: all, participants, dsu, fide, ratings, app, games\nOptions:\n  -f, --file <path>       Local snapshot (default: ${DEFAULT_SNAPSHOT})\n  -u, --url <url>         Override the saved tournament URL for this run\n      --danbase <path>    Danbase PGN (default: ${DEFAULT_DANBASE})\n      --app-url <url>     Target app (default: OPPONENT_BROWSER_URL or Production)\n      --packs-dir <path>  Local PGN packs (default: packs)\n      --throttle <ms>     Delay between rating pages (default: 2500)\n`;
 }
 
 export async function main(argv = process.argv.slice(2)) {

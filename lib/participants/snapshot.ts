@@ -14,6 +14,8 @@ export type ParticipantSnapshotPlayer = {
 };
 
 export type ParticipantSnapshot = {
+  tournamentNickname: string | null;
+  participantGroup: string | null;
   sourceUrl: string | null;
   extractedAt: string | null;
   ratingsUpdatedAt: string | null;
@@ -93,6 +95,8 @@ export function parseParticipantSnapshot(value: unknown): ParticipantSnapshot {
   }
 
   return {
+    tournamentNickname: optionalText(input.tournamentNickname, 80),
+    participantGroup: optionalText(input.participantGroup, 120),
     sourceUrl: profileUrl(input.sourceUrl),
     extractedAt: timestamp(input.extractedAt),
     ratingsUpdatedAt: timestamp(input.ratingsUpdatedAt),

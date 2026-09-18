@@ -8,14 +8,15 @@ import { getDb } from "@/lib/db";
 import { tournaments } from "@/lib/db/schema";
 import {
   parseTournamentId,
-  validateTournamentName,
+  type TournamentDetailsErrorCode,
+  validateTournamentDetails,
 } from "@/lib/tournaments/validation";
 
-function redirectWithRenameError(
+function redirectWithDetailsError(
   tournamentId: number | null,
-  error: "required" | "too_long" | "database",
+  error: TournamentDetailsErrorCode | "database",
 ): never {
-  const params = new URLSearchParams({ renameError: error });
+  const params = new URLSearchParams({ detailsError: error });
 
   if (tournamentId !== null) {
     params.set("tournamentId", String(tournamentId));
@@ -24,22 +25,27 @@ function redirectWithRenameError(
   redirect(`/admin?${params.toString()}`);
 }
 
-export async function renameTournament(formData: FormData) {
+export async function updateTournamentDetails(formData: FormData) {
   const tournamentId = parseTournamentId(formData.get("tournamentId"));
-  const validation = validateTournamentName(formData.get("name"));
+  const validation = validateTournamentDetails({
+    name: formData.get("name"),
+    nickname: formData.get("nickname"),
+    sourceUrl: formData.get("sourceUrl"),
+    participantGroup: formData.get("participantGroup"),
+  });
 
   if (tournamentId === null) {
-    redirectWithRenameError(null, "database");
+    redirectWithDetailsError(null, "database");
   }
 
   if (!validation.success) {
-    redirectWithRenameError(tournamentId, validation.error);
+    redirectWithDetailsError(tournamentId, validation.error);
   }
 
   try {
     const [updated] = await getDb()
       .update(tournaments)
-      .set({ name: validation.name })
+      .set(validation.details)
       .where(eq(tournaments.id, tournamentId))
       .returning({ id: tournaments.id });
 
@@ -47,8 +53,8 @@ export async function renameTournament(formData: FormData) {
       throw new Error("Tournament update returned no row");
     }
   } catch (error) {
-    console.error("Failed to rename tournament", error);
-    redirectWithRenameError(tournamentId, "database");
+    console.error("Failed to update tournament", error);
+    redirectWithDetailsError(tournamentId, "database");
   }
 
   revalidatePath("/");
