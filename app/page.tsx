@@ -7,6 +7,8 @@ import { tournaments } from "@/lib/db/schema";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
+  let tournamentId: number | null = null;
+
   try {
     const [tournament] = await getDb()
       .select({ id: tournaments.id })
@@ -14,9 +16,10 @@ export default async function Home() {
       .orderBy(desc(tournaments.createdAt), desc(tournaments.id))
       .limit(1);
 
-    redirect(tournament ? `/tournaments/${tournament.id}` : "/admin");
+    tournamentId = tournament?.id ?? null;
   } catch (error) {
     console.error("Failed to open tournament", error);
-    redirect("/admin");
   }
+
+  redirect(tournamentId ? `/tournaments/${tournamentId}` : "/admin");
 }
