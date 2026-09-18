@@ -12,29 +12,17 @@ export async function deleteTournament(formData: FormData) {
   const tournamentId = parseTournamentId(formData.get("tournamentId"));
 
   if (tournamentId === null) {
-    redirect("/");
+    redirect("/admin");
   }
 
-  let deleted = false;
-
   try {
-    const [deletedTournament] = await getDb()
-      .delete(tournaments)
-      .where(eq(tournaments.id, tournamentId))
-      .returning({ id: tournaments.id });
-
-    deleted = Boolean(deletedTournament);
+    await getDb().delete(tournaments).where(eq(tournaments.id, tournamentId));
   } catch (error) {
     console.error("Failed to delete tournament", error);
-    redirect(`/tournaments/${tournamentId}?deleteError=database`);
+    redirect("/admin?deleteError=database");
   }
 
   revalidatePath("/");
-  revalidatePath(`/tournaments/${tournamentId}`);
-
-  if (!deleted) {
-    redirect("/");
-  }
-
-  redirect("/");
+  revalidatePath("/admin");
+  redirect("/admin");
 }
