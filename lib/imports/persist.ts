@@ -243,8 +243,18 @@ export async function persistParsedImport(
       identities,
     );
 
-    if (existingResolution.playerId !== null) {
-      focalPlayer = identities.byId.get(existingResolution.playerId) ?? null;
+    const canonicalResolution = existingResolution.playerId === null
+      ? resolveImportedSide(
+          {
+            name: input.focalOpponent.canonicalName,
+            fideId: input.focalOpponent.sourceFideId,
+          },
+          identities,
+        )
+      : existingResolution;
+
+    if (canonicalResolution.playerId !== null) {
+      focalPlayer = identities.byId.get(canonicalResolution.playerId) ?? null;
     }
 
     if (!focalPlayer) {

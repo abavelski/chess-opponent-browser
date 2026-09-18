@@ -56,6 +56,7 @@ describe("local opponent PGN extraction", () => {
     expect(normalizePlayerName("  NIELSEN,Jens   Ove Fries  ")).toBe(
       "nielsen,jens ove fries",
     );
+    expect(normalizePlayerName("Nielsen, Jens Ove Fries")).toBe("nielsen,jens ove fries");
     expect(normalizePlayerName("Ａｌｅｘｅｉ")).toBe("alexei");
   });
 

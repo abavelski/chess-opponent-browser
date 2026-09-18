@@ -10,7 +10,7 @@ import { extractOpponentPacks } from "./extract-opponent.mjs";
 const DEFAULT_SNAPSHOT = "data/participants.json";
 const DEFAULT_DANBASE = "C:/dev/danbase.pgn";
 const DEFAULT_APP_URL = "https://chess-opponent-browser.vercel.app";
-const DEFAULT_TOURNAMENT_URL = "https://turnering.skak.dk/TournamentActive/Details?tourId=30447";
+const DEFAULT_TOURNAMENT_URL = "https://turnering.skak.dk/TournamentActive/Details?tourId=30508";
 const COMMANDS = new Set(["all", "participants", "dsu", "fide", "ratings", "app", "games"]);
 
 export function toRating(value) {
@@ -27,6 +27,20 @@ export function identityKeys(player) {
     player.dsuProfileUrl ? `dsu-url:${clean(player.dsuProfileUrl)}` : null,
     player.name ? `name:${clean(player.name).replace(/\s+/g, " ")}` : null,
   ].filter(Boolean);
+}
+
+export function danbaseNameVariants(name) {
+  const canonical = String(name ?? "").normalize("NFKC").trim().replace(/\s+/g, " ");
+  const withoutTitle = canonical.replace(/^(?:GM|IM|FM|CM|WGM|WIM|WFM|WCM)\s+/i, "");
+  const variants = new Set([canonical, withoutTitle]);
+  const parts = withoutTitle.split(" ");
+  if (parts.length > 1) {
+    const surname = parts.at(-1);
+    const givenNames = parts.slice(0, -1).join(" ");
+    variants.add(`${surname}, ${givenNames}`);
+    variants.add(`${surname},${givenNames}`);
+  }
+  return [...variants].filter(Boolean);
 }
 
 export function mergeParticipants(existing, fresh) {
@@ -283,7 +297,10 @@ export async function syncGames(options) {
     inputPath: options.danbasePath,
     opponents: snapshot.players.map((player) => ({
       name: player.name,
-      names: [player.name, ...(Array.isArray(player.danbaseAliases) ? player.danbaseAliases : [])],
+      names: [
+        ...danbaseNameVariants(player.name),
+        ...(Array.isArray(player.danbaseAliases) ? player.danbaseAliases : []),
+      ],
       outputPath: join(outputDirectory, packFilename(player.name)),
     })),
   });
@@ -295,7 +312,6 @@ export async function syncGames(options) {
     const pack = extraction.opponents[index];
     try {
       if (!pack || pack.matched === 0) {
-        failures += 1;
         process.stderr.write("  no Danbase games found.\n");
       } else {
         const uploaded = await uploadPack({ baseUrl: options.appUrl, name: player.name, packPath: pack.outputPath });

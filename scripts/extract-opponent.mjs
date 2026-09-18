@@ -13,6 +13,7 @@ export function normalizePlayerName(value) {
     .normalize("NFKC")
     .trim()
     .replace(/\s+/g, " ")
+    .replace(/\s*,\s*/g, ",")
     .toLowerCase();
 }
 
