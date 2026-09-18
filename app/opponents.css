@@ -232,3 +232,256 @@
     border-bottom: 0;
   }
 }
+
+
+/* Compact opponent preparation workspace */
+.opponent-workspace-shell {
+  width: min(100% - 1.5rem, 94rem);
+  padding: 2rem 0;
+}
+
+.compact-opponent-topbar {
+  display: flex;
+  min-height: 1.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.86rem;
+}
+
+.compact-back-link {
+  margin-bottom: 0;
+}
+
+.compact-opponent-header {
+  margin-bottom: 1rem;
+}
+
+.compact-opponent-header h1 {
+  margin: 0;
+  font-size: clamp(1.55rem, 3vw, 2.05rem);
+  letter-spacing: -0.025em;
+}
+
+.compact-game-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.55rem;
+  margin-bottom: 0.85rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.compact-filter-field {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.compact-filter-field select {
+  min-height: 2rem;
+  padding: 0.28rem 1.7rem 0.28rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+}
+
+.compact-filter-field select:focus-visible,
+.compact-game-row:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.compact-filter-reset {
+  margin-left: auto;
+  align-self: center;
+  font-size: 0.8rem;
+}
+
+.compact-filter-submit {
+  min-height: 2rem;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.8rem;
+}
+
+.workspace-hotkey-hint {
+  margin: 0 0 0.55rem;
+  color: var(--muted);
+  font-size: 0.74rem;
+  text-align: right;
+}
+
+.opponent-workspace {
+  display: grid;
+  grid-template-columns: minmax(17rem, 22rem) minmax(0, 1fr);
+  align-items: start;
+  gap: 1rem;
+}
+
+.opponent-game-list-pane {
+  max-height: calc(100vh - 11.5rem);
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  background: var(--surface);
+}
+
+.compact-game-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.compact-game-list li + li {
+  border-top: 1px solid var(--border);
+}
+
+.compact-game-row {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.62rem 0.7rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.compact-game-row:hover {
+  background: var(--surface-muted);
+}
+
+.compact-game-row.is-selected {
+  box-shadow: inset 3px 0 0 var(--accent);
+  background: #eef3ed;
+}
+
+.compact-game-names {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 0.35rem;
+  font-size: 0.86rem;
+  line-height: 1.25;
+}
+
+.compact-game-names strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact-game-names strong:first-child {
+  flex: 1 1 50%;
+}
+
+.compact-game-names strong:last-child {
+  flex: 1 1 50%;
+}
+
+.compact-game-names > span {
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+
+.compact-game-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.compact-game-meta strong {
+  color: var(--text);
+}
+
+.opponent-review-pane {
+  min-width: 0;
+}
+
+.compact-review-heading {
+  display: flex;
+  min-height: 2.4rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.55rem;
+  font-size: 0.86rem;
+}
+
+.compact-review-matchup {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 0.55rem;
+}
+
+.compact-review-matchup strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact-review-matchup span {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.compact-workspace-empty,
+.compact-viewer-empty {
+  padding: 1rem;
+}
+
+.compact-viewer-empty p {
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .opponent-workspace-shell {
+    width: min(100% - 1rem, 94rem);
+  }
+
+  .workspace-hotkey-hint {
+    text-align: left;
+  }
+
+  .opponent-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .opponent-game-list-pane {
+    max-height: 18rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .compact-opponent-topbar,
+  .compact-review-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .compact-game-filters {
+    align-items: stretch;
+  }
+
+  .compact-filter-field {
+    justify-content: space-between;
+  }
+
+  .compact-filter-reset {
+    width: 100%;
+    margin-left: 0;
+  }
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Chessboard } from "react-chessboard";
 
 import {
@@ -16,6 +16,7 @@ import {
 
 type GameViewerProps = {
   replay: ReplayDocument;
+  compact?: boolean;
 };
 
 type NotationLineProps = {
@@ -28,6 +29,17 @@ type NotationLineProps = {
 
 function notationPrefix(moveNumber: number, side: "white" | "black") {
   return side === "white" ? `${moveNumber}.` : `${moveNumber}...`;
+}
+
+function isTypingTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+
+  return (
+    target.isContentEditable ||
+    target.tagName === "INPUT" ||
+    target.tagName === "SELECT" ||
+    target.tagName === "TEXTAREA"
+  );
 }
 
 function NotationLine({ replay, lineId, selected, onSelect, depth = 0 }: NotationLineProps) {
@@ -71,7 +83,7 @@ function NotationLine({ replay, lineId, selected, onSelect, depth = 0 }: Notatio
   );
 }
 
-export function GameViewer({ replay }: GameViewerProps) {
+export function GameViewer({ replay, compact = false }: GameViewerProps) {
   const [selection, setSelection] = useState<ReplaySelection>(() => startSelection(replay));
   const [flipped, setFlipped] = useState(false);
 
@@ -88,23 +100,53 @@ export function GameViewer({ replay }: GameViewerProps) {
     : "Starting position";
   const boardOptions = useMemo(
     () => ({
-      id: "game-replay-board",
+      id: compact ? "embedded-game-replay-board" : "game-replay-board",
       position: fen,
       boardOrientation: flipped ? ("black" as const) : ("white" as const),
       allowDragging: false,
       allowDrawingArrows: false,
       showNotation: true,
       showAnimations: true,
-      animationDurationInMs: 180,
+      animationDurationInMs: 140,
       boardStyle: {
-        borderRadius: "0.65rem",
+        borderRadius: compact ? "0.4rem" : "0.65rem",
       },
     }),
-    [fen, flipped],
+    [compact, fen, flipped],
   );
 
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.metaKey || event.ctrlKey || event.altKey || isTypingTarget(event.target)) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+
+      if (event.key === "ArrowLeft" && previous) {
+        event.preventDefault();
+        setSelection(previous);
+      } else if (event.key === "ArrowRight" && next) {
+        event.preventDefault();
+        setSelection(next);
+      } else if (event.key === "Home" && !atStart) {
+        event.preventDefault();
+        setSelection(startSelection(replay));
+      } else if (event.key === "End" && !atEnd) {
+        event.preventDefault();
+        setSelection(end);
+      } else if (key === "f") {
+        event.preventDefault();
+        setFlipped((value) => !value);
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [atEnd, atStart, end, next, previous, replay]);
+
   return (
-    <div className="viewer-layout">
+    <div className={`viewer-layout${compact ? " compact-viewer-layout" : ""}`}>
       <section aria-label="Chessboard and replay controls" className="board-column">
         <div
           aria-label={`Chess position: ${positionLabel}`}
@@ -114,69 +156,99 @@ export function GameViewer({ replay }: GameViewerProps) {
           <Chessboard options={boardOptions} />
         </div>
 
-        <div aria-label="Game navigation" className="viewer-controls">
+        <div
+          aria-label="Game navigation"
+          className={`viewer-controls${compact ? " compact-viewer-controls" : ""}`}
+        >
           <button
             aria-label="Go to beginning of game"
             className="viewer-control-button"
             disabled={atStart}
             onClick={() => setSelection(startSelection(replay))}
+            title="Start (Home)"
             type="button"
           >
-            ⏮ Start
+            {compact ? "⏮" : "⏮ Start"}
           </button>
           <button
             aria-label="Previous move"
             className="viewer-control-button"
             disabled={!previous}
             onClick={() => previous && setSelection(previous)}
+            title="Previous move (Left arrow)"
             type="button"
           >
-            ← Previous
+            {compact ? "←" : "← Previous"}
           </button>
           <button
             aria-label="Next move"
             className="viewer-control-button"
             disabled={!next}
             onClick={() => next && setSelection(next)}
+            title="Next move (Right arrow)"
             type="button"
           >
-            Next →
+            {compact ? "→" : "Next →"}
           </button>
           <button
             aria-label="Go to end of main line"
             className="viewer-control-button"
             disabled={atEnd}
             onClick={() => setSelection(end)}
+            title="End (End)"
             type="button"
           >
-            End ⏭
+            {compact ? "⏭" : "End ⏭"}
           </button>
+          {compact ? (
+            <button
+              aria-label="Flip board orientation"
+              className="viewer-control-button"
+              onClick={() => setFlipped((value) => !value)}
+              title="Flip board (F)"
+              type="button"
+            >
+              Flip
+            </button>
+          ) : null}
         </div>
 
-        <div className="viewer-position-row">
-          <span aria-live="polite" className="current-position-label">
+        {compact ? (
+          <span aria-live="polite" className="compact-position-label">
             {positionLabel}
           </span>
-          <button
-            aria-label="Flip board orientation"
-            className="text-button"
-            onClick={() => setFlipped((value) => !value)}
-            type="button"
-          >
-            Flip board
-          </button>
-        </div>
+        ) : (
+          <div className="viewer-position-row">
+            <span aria-live="polite" className="current-position-label">
+              {positionLabel}
+            </span>
+            <button
+              aria-label="Flip board orientation"
+              className="text-button"
+              onClick={() => setFlipped((value) => !value)}
+              type="button"
+            >
+              Flip board
+            </button>
+          </div>
+        )}
       </section>
 
-      <section aria-labelledby="notation-heading" className="panel notation-panel">
-        <div className="notation-heading-row">
-          <div>
-            <p className="eyebrow">Stored notation</p>
-            <h2 id="notation-heading">Moves</h2>
+      <section
+        aria-label={compact ? "Game notation" : undefined}
+        aria-labelledby={compact ? undefined : "notation-heading"}
+        className="panel notation-panel"
+      >
+        {!compact ? (
+          <div className="notation-heading-row">
+            <div>
+              <p className="eyebrow">Stored notation</p>
+              <h2 id="notation-heading">Moves</h2>
+            </div>
+            <span className="muted">Click any move to jump</span>
           </div>
-          <span className="muted">Click any move to jump</span>
-        </div>
-        <div className="notation-scroll">
+        ) : null}
+        <div className={`notation-scroll${compact ? " compact-notation-scroll" : ""}`}>
           <NotationLine
             lineId={replay.mainLineId}
             onSelect={setSelection}

@@ -2,14 +2,9 @@ import { and, eq, gte, or, sql } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { GameViewer } from "@/app/games/[gameId]/game-viewer";
 import { getDb } from "@/lib/db";
-import {
-  games,
-  gameSources,
-  players,
-  tournamentParticipants,
-  tournaments,
-} from "@/lib/db/schema";
+import { games, players, tournamentParticipants, tournaments } from "@/lib/db/schema";
 import {
   buildGameFilterPlan,
   defaultGameFilters,
@@ -18,14 +13,10 @@ import {
   type GameFilterQuery,
   type GameFilterState,
 } from "@/lib/games/filters";
-import {
-  mapGameForPlayer,
-  openingLabel,
-  type PlayerGameListItem,
-  type StoredGameListRow,
-} from "@/lib/games/presentation";
+import { buildReplayDocument, type ReplayDocument } from "@/lib/games/viewer";
 
 import { GameFilterControls } from "./filter-controls";
+import { GameSelectionHotkeys } from "./game-hotkeys";
 
 export const dynamic = "force-dynamic";
 
@@ -34,9 +25,16 @@ type PlayerPageProps = {
   searchParams: Promise<GameFilterQuery>;
 };
 
-type SourceOption = {
-  key: string;
-  label: string;
+type CompactGameItem = {
+  id: number;
+  whiteName: string;
+  blackName: string;
+  date: string | null;
+  result: string;
+};
+
+type SelectedGame = CompactGameItem & {
+  replay: ReplayDocument | null;
 };
 
 function parsePositiveId(value: string) {
@@ -48,11 +46,19 @@ function parsePositiveId(value: string) {
   return Number.isSafeInteger(id) ? id : null;
 }
 
-function resultClass(result: PlayerGameListItem["result"]) {
-  if (result === "Win") return "result-win";
-  if (result === "Loss") return "result-loss";
-  if (result === "Draw") return "result-draw";
-  return "result-unknown";
+function firstValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function compactFilters(query: GameFilterQuery): GameFilterState {
+  const parsed = parseGameFilters(query, []);
+
+  return {
+    ...defaultGameFilters,
+    color: parsed.color,
+    date: parsed.date,
+    sort: parsed.sort,
+  };
 }
 
 export default async function PlayerPage({ params, searchParams }: PlayerPageProps) {
@@ -71,13 +77,10 @@ export default async function PlayerPage({ params, searchParams }: PlayerPagePro
     | {
         tournamentName: string;
         playerName: string;
-        fideId: string | null;
-        federation: string | null;
-        rating: number | null;
       }
     | undefined;
-  let gameItems: PlayerGameListItem[] = [];
-  let sourceOptions: SourceOption[] = [];
+  let gameItems: CompactGameItem[] = [];
+  let selectedGame: SelectedGame | null = null;
   let activeFilters: GameFilterState = defaultGameFilters;
   let hasAnyKnownGames = false;
 
@@ -88,9 +91,6 @@ export default async function PlayerPage({ params, searchParams }: PlayerPagePro
       .select({
         tournamentName: tournaments.name,
         playerName: players.name,
-        fideId: players.fideId,
-        federation: tournamentParticipants.federation,
-        rating: tournamentParticipants.rating,
       })
       .from(tournamentParticipants)
       .innerJoin(tournaments, eq(tournamentParticipants.tournamentId, tournaments.id))
@@ -109,18 +109,14 @@ export default async function PlayerPage({ params, searchParams }: PlayerPagePro
         eq(games.blackPlayerId, playerId),
       );
 
-      sourceOptions = await db
-        .selectDistinct({ key: gameSources.sourceKey, label: gameSources.label })
+      const [knownGame] = await db
+        .select({ id: games.id })
         .from(games)
-        .innerJoin(gameSources, eq(games.sourceId, gameSources.id))
         .where(playerLinkCondition)
-        .orderBy(gameSources.label, gameSources.sourceKey);
+        .limit(1);
+      hasAnyKnownGames = Boolean(knownGame);
 
-      hasAnyKnownGames = sourceOptions.length > 0;
-      activeFilters = parseGameFilters(
-        query,
-        sourceOptions.map((source) => source.key),
-      );
+      activeFilters = compactFilters(query);
       const plan = buildGameFilterPlan(activeFilters, new Date());
 
       const colorCondition =
@@ -131,34 +127,6 @@ export default async function PlayerPage({ params, searchParams }: PlayerPagePro
             : undefined;
       const dateCondition = plan.minPlayedOn
         ? gte(games.playedOn, plan.minPlayedOn)
-        : undefined;
-      const ratingCondition = plan.minOpponentRating
-        ? or(
-            and(
-              eq(games.whitePlayerId, playerId),
-              gte(games.blackRating, plan.minOpponentRating),
-            ),
-            and(
-              eq(games.blackPlayerId, playerId),
-              gte(games.whiteRating, plan.minOpponentRating),
-            ),
-          )
-        : undefined;
-      const resultCondition =
-        plan.whiteResult && plan.blackResult
-          ? or(
-              and(
-                eq(games.whitePlayerId, playerId),
-                eq(games.result, plan.whiteResult),
-              ),
-              and(
-                eq(games.blackPlayerId, playerId),
-                eq(games.result, plan.blackResult),
-              ),
-            )
-          : undefined;
-      const sourceCondition = plan.sourceKey
-        ? eq(gameSources.sourceKey, plan.sourceKey)
         : undefined;
 
       const orderExpressions =
@@ -179,42 +147,57 @@ export default async function PlayerPage({ params, searchParams }: PlayerPagePro
       const gameRows = await db
         .select({
           id: games.id,
-          whitePlayerId: games.whitePlayerId,
-          blackPlayerId: games.blackPlayerId,
           whiteName: games.whiteName,
           blackName: games.blackName,
-          whiteRating: games.whiteRating,
-          blackRating: games.blackRating,
           playedOn: games.playedOn,
           result: games.result,
-          event: games.event,
-          eco: games.eco,
-          opening: games.opening,
-          sourceLabel: gameSources.label,
         })
         .from(games)
-        .innerJoin(gameSources, eq(games.sourceId, gameSources.id))
-        .where(
-          and(
-            playerLinkCondition,
-            colorCondition,
-            dateCondition,
-            ratingCondition,
-            resultCondition,
-            sourceCondition,
-          ),
-        )
+        .where(and(playerLinkCondition, colorCondition, dateCondition))
         .orderBy(...orderExpressions);
 
-      gameItems = gameRows.map((row) =>
-        mapGameForPlayer(playerId, {
-          ...row,
-          result: row.result as StoredGameListRow["result"],
-        }),
-      );
+      gameItems = gameRows.map((game) => ({
+        id: game.id,
+        whiteName: game.whiteName,
+        blackName: game.blackName,
+        date: game.playedOn,
+        result: game.result,
+      }));
+
+      const requestedGameId = parsePositiveId(firstValue(query.game) ?? "");
+      const selectedGameId =
+        requestedGameId && gameItems.some((game) => game.id === requestedGameId)
+          ? requestedGameId
+          : gameItems[0]?.id ?? null;
+
+      if (selectedGameId !== null) {
+        const [row] = await db
+          .select({
+            id: games.id,
+            whiteName: games.whiteName,
+            blackName: games.blackName,
+            playedOn: games.playedOn,
+            result: games.result,
+            structuredMoves: games.structuredMoves,
+          })
+          .from(games)
+          .where(eq(games.id, selectedGameId))
+          .limit(1);
+
+        if (row) {
+          selectedGame = {
+            id: row.id,
+            whiteName: row.whiteName,
+            blackName: row.blackName,
+            date: row.playedOn,
+            result: row.result,
+            replay: buildReplayDocument(row.structuredMoves),
+          };
+        }
+      }
     }
   } catch (error) {
-    console.error("Failed to load tournament player", error);
+    console.error("Failed to load opponent workspace", error);
 
     return (
       <main className="app-shell narrow-shell">
@@ -222,7 +205,7 @@ export default async function PlayerPage({ params, searchParams }: PlayerPagePro
           ← Tournament
         </Link>
         <section className="panel empty-state" role="alert">
-          <h1>Player could not be loaded</h1>
+          <h1>Opponent could not be loaded</h1>
           <p>Try refreshing the page. If the problem continues, check the database health.</p>
         </section>
       </main>
@@ -235,115 +218,116 @@ export default async function PlayerPage({ params, searchParams }: PlayerPagePro
 
   const playerPath = `/tournaments/${tournamentId}/players/${playerId}`;
   const active = hasActiveGameFilters(activeFilters);
-  const returnParams = new URLSearchParams({
-    color: activeFilters.color,
-    date: activeFilters.date,
-    rating: activeFilters.rating,
-    result: activeFilters.result,
-    source: activeFilters.source,
-    sort: activeFilters.sort,
-  });
-  const returnPath = `${playerPath}?${returnParams.toString()}`;
+
+  function gameHref(gameId: number) {
+    const params = new URLSearchParams();
+
+    if (activeFilters.color !== "all") params.set("color", activeFilters.color);
+    if (activeFilters.date !== "all") params.set("date", activeFilters.date);
+    if (activeFilters.sort !== "newest") params.set("sort", activeFilters.sort);
+    params.set("game", String(gameId));
+
+    return `${playerPath}?${params.toString()}`;
+  }
+
+  const gameHrefs = gameItems.map((game) => gameHref(game.id));
 
   return (
-    <main className="app-shell">
-      <Link className="back-link" href={`/tournaments/${tournamentId}`}>
-        ← {detail.tournamentName}
-      </Link>
+    <main className="app-shell opponent-workspace-shell">
+      <div className="compact-opponent-topbar">
+        <Link className="back-link compact-back-link" href={`/tournaments/${tournamentId}`}>
+          ← {detail.tournamentName}
+        </Link>
+        <span className="muted">{gameItems.length} games</span>
+      </div>
 
-      <header className="detail-header player-detail-header">
-        <p className="eyebrow">Potential opponent</p>
+      <header className="compact-opponent-header">
         <h1>{detail.playerName}</h1>
       </header>
 
-      <section aria-labelledby="identity-heading" className="section-stack player-identity-section">
-        <h2 id="identity-heading">Player details</h2>
-        <dl className="panel identity-grid">
-          <div>
-            <dt>FIDE ID</dt>
-            <dd>{detail.fideId ?? "Not provided"}</dd>
-          </div>
-          <div>
-            <dt>Federation</dt>
-            <dd>{detail.federation ?? "Not provided"}</dd>
-          </div>
-          <div>
-            <dt>Tournament rating</dt>
-            <dd>{detail.rating ?? "Not provided"}</dd>
-          </div>
-        </dl>
-      </section>
+      {hasAnyKnownGames ? (
+        <GameFilterControls
+          action={playerPath}
+          showReset={active}
+          value={activeFilters}
+        />
+      ) : null}
 
-      <section aria-labelledby="games-heading" className="section-stack games-section">
-        <div className="section-heading game-section-heading">
-          <h2 id="games-heading">Known games</h2>
-          <span className="game-count" aria-live="polite">
-            {gameItems.length} matching {gameItems.length === 1 ? "game" : "games"}
-          </span>
-        </div>
-
-        {hasAnyKnownGames ? (
-          <GameFilterControls
-            action={playerPath}
-            showReset={active}
-            sources={sourceOptions}
-            value={activeFilters}
+      {!hasAnyKnownGames ? (
+        <section className="panel empty-state compact-workspace-empty">
+          <h2>No known games yet</h2>
+          <p>No globally stored games are linked to this player yet.</p>
+        </section>
+      ) : gameItems.length === 0 ? (
+        <section className="panel empty-state compact-workspace-empty">
+          <h2>No games match these filters</h2>
+          <p>Try a broader color or date range.</p>
+          <Link className="text-link" href={playerPath}>
+            Reset filters
+          </Link>
+        </section>
+      ) : (
+        <>
+          <GameSelectionHotkeys
+            gameHrefs={gameHrefs}
+            selectedGameId={selectedGame?.id ?? null}
+            gameIds={gameItems.map((game) => game.id)}
           />
-        ) : null}
 
-        {!hasAnyKnownGames ? (
-          <div className="panel empty-state">
-            <h3>No known games yet</h3>
-            <p>No globally stored games are linked to this player yet.</p>
-          </div>
-        ) : gameItems.length === 0 ? (
-          <div className="panel empty-state">
-            <h3>No games match these filters</h3>
-            <p>Try broadening the preparation set or reset all filters.</p>
-            <Link className="button secondary-button" href={playerPath}>
-              Reset filters
-            </Link>
-          </div>
-        ) : (
-          <ul className="game-list">
-            {gameItems.map((game) => (
-              <li key={game.id}>
-                <Link
-                  className="panel game-card game-card-link"
-                  href={{ pathname: `/games/${game.id}`, query: { returnTo: returnPath } }}
-                >
-                  <div className="game-card-topline">
-                    <span className="game-date">{game.date ?? "—"}</span>
-                    <span className="color-pill">{game.color}</span>
-                    <span className={`result-pill ${resultClass(game.result)}`}>{game.result}</span>
+          <div className="opponent-workspace">
+            <aside aria-label="Games" className="opponent-game-list-pane">
+              <ul className="compact-game-list">
+                {gameItems.map((game) => {
+                  const selected = game.id === selectedGame?.id;
+
+                  return (
+                    <li key={game.id}>
+                      <Link
+                        aria-current={selected ? "page" : undefined}
+                        className={`compact-game-row${selected ? " is-selected" : ""}`}
+                        href={gameHref(game.id)}
+                      >
+                        <span className="compact-game-names">
+                          <strong>{game.whiteName}</strong>
+                          <span aria-hidden="true">–</span>
+                          <strong>{game.blackName}</strong>
+                        </span>
+                        <span className="compact-game-meta">
+                          <span>{game.date ?? "—"}</span>
+                          <strong>{game.result}</strong>
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </aside>
+
+            <section aria-label="Game review" className="opponent-review-pane">
+              {selectedGame ? (
+                <>
+                  <div className="compact-review-heading">
+                    <div className="compact-review-matchup">
+                      <strong>{selectedGame.whiteName}</strong>
+                      <span>{selectedGame.result}</span>
+                      <strong>{selectedGame.blackName}</strong>
+                    </div>
+                    <span className="muted">{selectedGame.date ?? "—"}</span>
                   </div>
 
-                  <div className="game-opponent">
-                    <strong>{game.opponentName}</strong>
-                    <span>{game.opponentRating ? `Rating ${game.opponentRating}` : "Rating —"}</span>
-                    <span className="game-open-cue">Review game →</span>
-                  </div>
-
-                  <dl className="game-metadata">
-                    <div>
-                      <dt>Event</dt>
-                      <dd>{game.event ?? "—"}</dd>
+                  {selectedGame.replay ? (
+                    <GameViewer compact key={selectedGame.id} replay={selectedGame.replay} />
+                  ) : (
+                    <div className="panel empty-state compact-viewer-empty">
+                      <p>Moves are unavailable for this game.</p>
                     </div>
-                    <div>
-                      <dt>Opening</dt>
-                      <dd>{openingLabel(game.eco, game.opening)}</dd>
-                    </div>
-                    <div>
-                      <dt>Source</dt>
-                      <dd>{game.sourceLabel}</dd>
-                    </div>
-                  </dl>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+                  )}
+                </>
+              ) : null}
+            </section>
+          </div>
+        </>
+      )}
     </main>
   );
 }
