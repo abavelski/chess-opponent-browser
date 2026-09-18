@@ -13,7 +13,12 @@ export type OpponentPackAnalysis = {
 };
 
 export function normalizePackPlayerName(name: string) {
-  return name.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
+  return name
+    .normalize("NFKC")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\s*,\s*/g, ",")
+    .toLowerCase();
 }
 
 export function analyzeOpponentPack(preview: PgnPreview): OpponentPackAnalysis {

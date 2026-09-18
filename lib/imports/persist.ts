@@ -127,7 +127,12 @@ type IdentityIndex = {
 };
 
 export function normalizeImportedPlayerName(name: string) {
-  return name.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
+  return name
+    .normalize("NFKC")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\s*,\s*/g, ",")
+    .toLowerCase();
 }
 
 function usableFideId(value: string | null) {

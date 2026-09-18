@@ -35,8 +35,21 @@ export async function POST(request: Request) {
   }
 
   const nameInput = formData.get("name");
+  const aliasesInput = formData.get("aliases");
   const uploaded = formData.get("pgnFile");
   const canonicalName = typeof nameInput === "string" ? nameInput.trim() : "";
+  let requestedAliases: string[] = [];
+  if (typeof aliasesInput === "string" && aliasesInput) {
+    try {
+      const parsed = JSON.parse(aliasesInput);
+      if (!Array.isArray(parsed) || parsed.some((alias) => typeof alias !== "string")) {
+        return errorResponse("aliases must be a JSON array of names.", 400);
+      }
+      requestedAliases = parsed.map((alias) => alias.trim()).filter(Boolean).slice(0, 20);
+    } catch {
+      return errorResponse("aliases must be valid JSON.", 400);
+    }
+  }
 
   if (!canonicalName) {
     return errorResponse("Opponent name is required.", 400);
@@ -86,8 +99,12 @@ export async function POST(request: Request) {
 
   const pack = analyzeOpponentPack(preview);
   const requestedKey = normalizePackPlayerName(canonicalName);
+  const requestedKeys = new Set([
+    requestedKey,
+    ...requestedAliases.map(normalizePackPlayerName),
+  ]);
   const focalCandidate =
-    pack.candidates.find((candidate) => candidate.normalizedName === requestedKey) ??
+    pack.candidates.find((candidate) => requestedKeys.has(candidate.normalizedName)) ??
     pack.candidates.find(
       (candidate) => candidate.normalizedName === pack.suggestedNormalizedName,
     );

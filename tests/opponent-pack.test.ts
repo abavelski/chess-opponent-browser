@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { analyzeOpponentPack } from "@/lib/imports/opponent-pack";
+import { analyzeOpponentPack, normalizePackPlayerName } from "@/lib/imports/opponent-pack";
 import { parsePgnPreview } from "@/lib/imports/pgn";
 
 const pgn = `[Event "Pack"]
@@ -20,6 +20,9 @@ const pgn = `[Event "Pack"]
 1. d4 d5 2. c4 e6 0-1`;
 
 describe("opponent pack analysis", () => {
+  it("normalizes comma spacing consistently", () => {
+    expect(normalizePackPlayerName("Nielsen ,  Jens")).toBe("nielsen,jens");
+  });
   it("auto-detects the only normalized player present in every game", () => {
     const analysis = analyzeOpponentPack(parsePgnPreview(pgn));
 

@@ -102,10 +102,11 @@ function absoluteFromCwd(filePath) {
   return isAbsolute(expanded) ? expanded : resolve(expanded);
 }
 
-export async function uploadPack({ baseUrl, name, packPath }) {
+export async function uploadPack({ baseUrl, name, packPath, aliases = [] }) {
   const rawPgn = await readFile(packPath);
   const formData = new FormData();
   formData.set("name", name);
+  if (aliases.length > 0) formData.set("aliases", JSON.stringify(aliases));
   formData.set(
     "pgnFile",
     new Blob([rawPgn], { type: "application/x-chess-pgn" }),

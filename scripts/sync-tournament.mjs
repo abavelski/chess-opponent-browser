@@ -314,7 +314,12 @@ export async function syncGames(options) {
       if (!pack || pack.matched === 0) {
         process.stderr.write("  no Danbase games found.\n");
       } else {
-        const uploaded = await uploadPack({ baseUrl: options.appUrl, name: player.name, packPath: pack.outputPath });
+        const uploaded = await uploadPack({
+          baseUrl: options.appUrl,
+          name: player.name,
+          aliases: danbaseNameVariants(player.name),
+          packPath: pack.outputPath,
+        });
         process.stdout.write(`  ${uploaded.import.importedCount} new, ${uploaded.import.duplicateCount} duplicate.\n`);
       }
     } catch (error) {
