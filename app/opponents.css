@@ -260,7 +260,7 @@
 
 .compact-opponent-header h1 {
   margin: 0;
-  font-size: clamp(1.55rem, 3vw, 2.05rem);
+  font-size: clamp(1.3rem, 2.4vw, 1.65rem);
   letter-spacing: -0.025em;
 }
 
@@ -483,5 +483,43 @@
   .compact-filter-reset {
     width: 100%;
     margin-left: 0;
+  }
+}
+
+
+.compact-review-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex: 0 0 auto;
+}
+
+.copy-pgn-button {
+  min-height: 1.9rem;
+  padding: 0.28rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: var(--surface);
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.copy-pgn-button:hover {
+  border-color: var(--focus);
+  background: var(--surface-muted);
+}
+
+.copy-pgn-button:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .compact-review-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 }

@@ -17,6 +17,7 @@ import {
 type GameViewerProps = {
   replay: ReplayDocument;
   compact?: boolean;
+  initialOrientation?: "white" | "black";
 };
 
 type NotationLineProps = {
@@ -83,9 +84,13 @@ function NotationLine({ replay, lineId, selected, onSelect, depth = 0 }: Notatio
   );
 }
 
-export function GameViewer({ replay, compact = false }: GameViewerProps) {
+export function GameViewer({
+  replay,
+  compact = false,
+  initialOrientation = "white",
+}: GameViewerProps) {
   const [selection, setSelection] = useState<ReplaySelection>(() => startSelection(replay));
-  const [flipped, setFlipped] = useState(false);
+  const [boardOrientation, setBoardOrientation] = useState<"white" | "black">(initialOrientation);
 
   const currentLine = findReplayLine(replay, selection.lineId);
   const currentMove = selection.index >= 0 ? currentLine?.moves[selection.index] ?? null : null;
@@ -102,7 +107,7 @@ export function GameViewer({ replay, compact = false }: GameViewerProps) {
     () => ({
       id: compact ? "embedded-game-replay-board" : "game-replay-board",
       position: fen,
-      boardOrientation: flipped ? ("black" as const) : ("white" as const),
+      boardOrientation,
       allowDragging: false,
       allowDrawingArrows: false,
       showNotation: true,
@@ -112,7 +117,7 @@ export function GameViewer({ replay, compact = false }: GameViewerProps) {
         borderRadius: compact ? "0.4rem" : "0.65rem",
       },
     }),
-    [compact, fen, flipped],
+    [boardOrientation, compact, fen],
   );
 
   useEffect(() => {
@@ -137,7 +142,7 @@ export function GameViewer({ replay, compact = false }: GameViewerProps) {
         setSelection(end);
       } else if (key === "f") {
         event.preventDefault();
-        setFlipped((value) => !value);
+        setBoardOrientation((value) => (value === "white" ? "black" : "white"));
       }
     }
 
@@ -204,7 +209,7 @@ export function GameViewer({ replay, compact = false }: GameViewerProps) {
             <button
               aria-label="Flip board orientation"
               className="viewer-control-button"
-              onClick={() => setFlipped((value) => !value)}
+              onClick={() => setBoardOrientation((value) => (value === "white" ? "black" : "white"))}
               title="Flip board (F)"
               type="button"
             >
@@ -225,7 +230,7 @@ export function GameViewer({ replay, compact = false }: GameViewerProps) {
             <button
               aria-label="Flip board orientation"
               className="text-button"
-              onClick={() => setFlipped((value) => !value)}
+              onClick={() => setBoardOrientation((value) => (value === "white" ? "black" : "white"))}
               type="button"
             >
               Flip board

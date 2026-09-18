@@ -16,6 +16,7 @@ import {
 import { buildReplayDocument, type ReplayDocument } from "@/lib/games/viewer";
 
 import { GameFilterControls } from "./filter-controls";
+import { CopyPgnButton } from "./copy-pgn-button";
 import { GameSelectionHotkeys } from "./game-hotkeys";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +36,8 @@ type CompactGameItem = {
 
 type SelectedGame = CompactGameItem & {
   replay: ReplayDocument | null;
+  orientation: "white" | "black";
+  originalPgn: string;
 };
 
 function parsePositiveId(value: string) {
@@ -178,6 +181,9 @@ export default async function PlayerPage({ params, searchParams }: PlayerPagePro
             blackName: games.blackName,
             playedOn: games.playedOn,
             result: games.result,
+            whitePlayerId: games.whitePlayerId,
+            blackPlayerId: games.blackPlayerId,
+            originalPgn: games.originalPgn,
             structuredMoves: games.structuredMoves,
           })
           .from(games)
@@ -192,6 +198,8 @@ export default async function PlayerPage({ params, searchParams }: PlayerPagePro
             date: row.playedOn,
             result: row.result,
             replay: buildReplayDocument(row.structuredMoves),
+            orientation: row.blackPlayerId === playerId ? "black" : "white",
+            originalPgn: row.originalPgn,
           };
         }
       }
@@ -312,11 +320,19 @@ export default async function PlayerPage({ params, searchParams }: PlayerPagePro
                       <span>{selectedGame.result}</span>
                       <strong>{selectedGame.blackName}</strong>
                     </div>
-                    <span className="muted">{selectedGame.date ?? "—"}</span>
+                    <div className="compact-review-actions">
+                      <span className="muted">{selectedGame.date ?? "—"}</span>
+                      <CopyPgnButton pgn={selectedGame.originalPgn} />
+                    </div>
                   </div>
 
                   {selectedGame.replay ? (
-                    <GameViewer compact key={selectedGame.id} replay={selectedGame.replay} />
+                    <GameViewer
+                      compact
+                      initialOrientation={selectedGame.orientation}
+                      key={selectedGame.id}
+                      replay={selectedGame.replay}
+                    />
                   ) : (
                     <div className="panel empty-state compact-viewer-empty">
                       <p>Moves are unavailable for this game.</p>
