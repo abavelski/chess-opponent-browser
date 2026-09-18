@@ -85,7 +85,7 @@ Run the complete workflow:
 npm run sync-tournament -- --url "https://turnering.skak.dk/TournamentActive/Details?tourId=..."
 ```
 
-The tournament URL is saved in the local snapshot, so later runs only need:
+The existing `tourId=30447` URL is the first-run default, and the selected URL is saved in the local snapshot, so later runs only need:
 
 ```bash
 npm run sync-tournament

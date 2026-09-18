@@ -10,6 +10,7 @@ import { extractOpponentPacks } from "./extract-opponent.mjs";
 const DEFAULT_SNAPSHOT = "data/participants.json";
 const DEFAULT_DANBASE = "C:/dev/danbase.pgn";
 const DEFAULT_APP_URL = "https://chess-opponent-browser.vercel.app";
+const DEFAULT_TOURNAMENT_URL = "https://turnering.skak.dk/TournamentActive/Details?tourId=30447";
 const COMMANDS = new Set(["all", "participants", "dsu", "fide", "ratings", "app", "games"]);
 
 export function toRating(value) {
@@ -191,8 +192,7 @@ async function extractAllParticipants(page) {
 
 export async function refreshParticipants(options) {
   const previous = await readSnapshot(options.snapshotPath).catch(() => ({ players: [], sourceUrl: null }));
-  const sourceUrl = options.tournamentUrl || previous.sourceUrl;
-  if (!sourceUrl) throw new Error("Provide the Danish tournament URL with --url for the first sync.");
+  const sourceUrl = options.tournamentUrl || previous.sourceUrl || DEFAULT_TOURNAMENT_URL;
   const browser = await launchBrowser();
   try {
     const page = await browser.newPage();
@@ -310,7 +310,7 @@ export async function syncGames(options) {
 }
 
 function usage() {
-  return `Synchronize a Danish tournament, ratings, and Danbase games.\n\nUsage:\n  npm run sync-tournament -- --url <tournament-url>\n  npm run sync-participants -- --url <tournament-url>\n  npm run sync-ratings\n  npm run sync-app\n  npm run sync-games\n\nCommands: all, participants, dsu, fide, ratings, app, games\nOptions:\n  -f, --file <path>       Local snapshot (default: ${DEFAULT_SNAPSHOT})\n  -u, --url <url>         Danish tournament URL (saved in the snapshot)\n      --danbase <path>    Danbase PGN (default: ${DEFAULT_DANBASE})\n      --app-url <url>     Target app (default: OPPONENT_BROWSER_URL or Production)\n      --packs-dir <path>  Local PGN packs (default: packs)\n      --throttle <ms>     Delay between rating pages (default: 2500)\n`;
+  return `Synchronize a Danish tournament, ratings, and Danbase games.\n\nUsage:\n  npm run sync-tournament -- --url <tournament-url>\n  npm run sync-participants -- --url <tournament-url>\n  npm run sync-ratings\n  npm run sync-app\n  npm run sync-games\n\nCommands: all, participants, dsu, fide, ratings, app, games\nOptions:\n  -f, --file <path>       Local snapshot (default: ${DEFAULT_SNAPSHOT})\n  -u, --url <url>         Danish tournament URL (saved; defaults to tourId 30447)\n      --danbase <path>    Danbase PGN (default: ${DEFAULT_DANBASE})\n      --app-url <url>     Target app (default: OPPONENT_BROWSER_URL or Production)\n      --packs-dir <path>  Local PGN packs (default: packs)\n      --throttle <ms>     Delay between rating pages (default: 2500)\n`;
 }
 
 export async function main(argv = process.argv.slice(2)) {
