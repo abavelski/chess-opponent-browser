@@ -5,14 +5,30 @@ import { DeleteTournamentForm } from "@/app/tournaments/[id]/delete-tournament-f
 import { getDb } from "@/lib/db";
 import { tournaments } from "@/lib/db/schema";
 
+import { renameTournament } from "./actions";
+
 export const dynamic = "force-dynamic";
 
+type RenameError = "required" | "too_long" | "database";
+
 type AdminPageProps = {
-  searchParams: Promise<{ deleteError?: string }>;
+  searchParams: Promise<{
+    deleteError?: string;
+    renameError?: RenameError;
+    tournamentId?: string;
+  }>;
 };
 
+function renameErrorMessage(error: RenameError | undefined) {
+  if (error === "required") return "Tournament name is required.";
+  if (error === "too_long") return "Tournament name is too long.";
+  if (error === "database") return "Tournament could not be renamed.";
+  return null;
+}
+
 export default async function AdminPage({ searchParams }: AdminPageProps) {
-  const { deleteError } = await searchParams;
+  const { deleteError, renameError, tournamentId: renameTournamentId } = await searchParams;
+  const renameMessage = renameErrorMessage(renameError);
   let tournamentRows: Array<{ id: number; name: string }> = [];
   let loadError = false;
 
@@ -50,22 +66,49 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       </nav>
 
       <section className="admin-tournaments">
-        {tournamentRows.map((tournament) => (
-          <article className="admin-tournament-row" key={tournament.id}>
-            <div>
-              <strong>{tournament.name}</strong>
-              <div className="admin-row-links">
-                <Link href={`/tournaments/${tournament.id}`}>Open</Link>
-                <Link href={`/imports/new?tournamentId=${tournament.id}`}>Import games</Link>
-                <Link href={`/tournaments/${tournament.id}/opponents/new`}>Add opponent</Link>
+        {tournamentRows.map((tournament) => {
+          const showRenameError =
+            renameMessage && renameTournamentId === String(tournament.id);
+
+          return (
+            <article className="admin-tournament-row" key={tournament.id}>
+              <div className="admin-tournament-main">
+                <form action={renameTournament} className="admin-rename-form">
+                  <input name="tournamentId" type="hidden" value={tournament.id} />
+                  <label className="sr-only" htmlFor={`tournament-name-${tournament.id}`}>
+                    Tournament name
+                  </label>
+                  <input
+                    defaultValue={tournament.name}
+                    id={`tournament-name-${tournament.id}`}
+                    maxLength={200}
+                    name="name"
+                    required
+                    type="text"
+                  />
+                  <button className="button secondary-button admin-save-name" type="submit">
+                    Save name
+                  </button>
+                </form>
+
+                {showRenameError ? (
+                  <p className="form-error admin-rename-error">{renameMessage}</p>
+                ) : null}
+
+                <div className="admin-row-links">
+                  <Link href={`/tournaments/${tournament.id}`}>Open</Link>
+                  <Link href={`/imports/new?tournamentId=${tournament.id}`}>Import games</Link>
+                  <Link href={`/tournaments/${tournament.id}/opponents/new`}>Add opponent</Link>
+                </div>
               </div>
-            </div>
-            <DeleteTournamentForm
-              tournamentId={tournament.id}
-              tournamentName={tournament.name}
-            />
-          </article>
-        ))}
+
+              <DeleteTournamentForm
+                tournamentId={tournament.id}
+                tournamentName={tournament.name}
+              />
+            </article>
+          );
+        })}
       </section>
     </main>
   );
