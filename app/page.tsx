@@ -1,4 +1,4 @@
-import { desc } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
 import { getDb } from "@/lib/db";
@@ -13,7 +13,7 @@ export default async function Home() {
     const [tournament] = await getDb()
       .select({ id: tournaments.id })
       .from(tournaments)
-      .orderBy(desc(tournaments.createdAt), desc(tournaments.id))
+      .where(eq(tournaments.isActive, true))
       .limit(1);
 
     tournamentId = tournament?.id ?? null;

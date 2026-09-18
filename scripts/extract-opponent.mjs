@@ -163,6 +163,95 @@ export async function extractOpponentPgn({ inputPath, outputPath, names }) {
   return { scanned, matched, outputPath: resolvedOutput };
 }
 
+export async function extractOpponentPacks({ inputPath, opponents }) {
+  const resolvedInput = resolve(inputPath);
+  if (!Array.isArray(opponents) || opponents.length === 0) {
+    throw new Error("Provide at least one opponent.");
+  }
+
+  try {
+    await access(resolvedInput, constants.R_OK);
+  } catch {
+    throw new Error(`Input PGN cannot be read: ${resolvedInput}`);
+  }
+
+  const targets = opponents.map((opponent) => ({
+    ...opponent,
+    outputPath: resolve(opponent.outputPath),
+    normalizedNames: new Set((opponent.names ?? [opponent.name]).map(normalizePlayerName).filter(Boolean)),
+    matched: 0,
+    output: null,
+  }));
+  if (targets.some((target) => target.outputPath === resolvedInput)) {
+    throw new Error("Input and output must be different files.");
+  }
+
+  try {
+    for (const target of targets) target.output = await openOutput(target.outputPath);
+  } catch (error) {
+    for (const target of targets) target.output?.destroy();
+    throw error;
+  }
+
+  const input = createReadStream(resolvedInput, { encoding: "utf8" });
+  const lines = readline.createInterface({ input, crlfDelay: Infinity });
+  let currentLines = [];
+  let tags = {};
+  let sawTag = false;
+  let sawMovetext = false;
+  let braceDepth = 0;
+  let scanned = 0;
+
+  const resetGame = () => {
+    currentLines = [];
+    tags = {};
+    sawTag = false;
+    sawMovetext = false;
+    braceDepth = 0;
+  };
+  const finishGame = async () => {
+    if (!sawTag) return resetGame();
+    scanned += 1;
+    const text = gameText(currentLines);
+    if (text) {
+      for (const target of targets) {
+        if (!gameMatchesPlayer(tags, target.normalizedNames)) continue;
+        if (target.matched > 0) await writeChunk(target.output, "\n\n");
+        await writeChunk(target.output, text);
+        target.matched += 1;
+      }
+    }
+    resetGame();
+  };
+
+  try {
+    for await (const line of lines) {
+      const parsedTag = parseTagLine(line);
+      if (parsedTag && sawTag && sawMovetext && braceDepth === 0) await finishGame();
+      if (!sawTag && currentLines.length === 0 && line === "") continue;
+      currentLines.push(line);
+      if (parsedTag && !sawMovetext) {
+        sawTag = true;
+        tags[parsedTag.name] = parsedTag.value;
+      } else if (sawTag && line.trim() !== "") {
+        sawMovetext = true;
+        braceDepth = updateBraceDepth(line, braceDepth);
+      }
+    }
+    await finishGame();
+    for (const target of targets) if (target.matched > 0) await writeChunk(target.output, "\n");
+  } finally {
+    lines.close();
+    input.destroy();
+    await Promise.all(targets.map((target) => new Promise((resolveClose) => target.output.end(resolveClose))));
+  }
+
+  return {
+    scanned,
+    opponents: targets.map(({ name, outputPath: targetPath, matched }) => ({ name, outputPath: targetPath, matched })),
+  };
+}
+
 export function parseArguments(argv) {
   const result = { inputPath: "", outputPath: "", names: [], help: false };
 

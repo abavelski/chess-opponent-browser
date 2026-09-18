@@ -102,7 +102,7 @@ function absoluteFromCwd(filePath) {
   return isAbsolute(expanded) ? expanded : resolve(expanded);
 }
 
-async function uploadPack({ baseUrl, name, packPath }) {
+export async function uploadPack({ baseUrl, name, packPath }) {
   const rawPgn = await readFile(packPath);
   const formData = new FormData();
   formData.set("name", name);

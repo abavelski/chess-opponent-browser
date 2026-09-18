@@ -50,6 +50,13 @@
       "when": 1789635600000,
       "tag": "0006_resolve_player_identities",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789742053063,
+      "tag": "0007_safe_runaways",
+      "breakpoints": true
     }
   ]
 }

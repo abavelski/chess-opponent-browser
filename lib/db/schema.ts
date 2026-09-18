@@ -27,9 +27,14 @@ export const tournaments = pgTable(
   {
     id: serial("id").primaryKey(),
     name: varchar("name", { length: 200 }).notNull(),
+    isActive: boolean("is_active").default(false).notNull(),
+    sourceUrl: text("source_url"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
+    uniqueIndex("tournaments_one_active_unique")
+      .on(table.isActive)
+      .where(sql`${table.isActive} = true`),
     check("tournaments_name_not_blank", sql`char_length(btrim(${table.name})) > 0`),
   ],
 );
@@ -39,11 +44,21 @@ export const players = pgTable(
   {
     id: serial("id").primaryKey(),
     name: varchar("name", { length: 200 }).notNull(),
+    dsuId: varchar("dsu_id", { length: 32 }).unique(),
     fideId: varchar("fide_id", { length: 32 }).unique(),
+    currentDsuRating: integer("current_dsu_rating"),
+    currentFideRating: integer("current_fide_rating"),
+    dsuProfileUrl: text("dsu_profile_url"),
+    fideProfileUrl: text("fide_profile_url"),
+    ratingsUpdatedAt: timestamp("ratings_updated_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     check("players_name_not_blank", sql`char_length(btrim(${table.name})) > 0`),
+    check(
+      "players_dsu_id_not_blank",
+      sql`${table.dsuId} is null or char_length(btrim(${table.dsuId})) > 0`,
+    ),
     check(
       "players_fide_id_not_blank",
       sql`${table.fideId} is null or char_length(btrim(${table.fideId})) > 0`,
@@ -88,6 +103,12 @@ export const tournamentParticipants = pgTable(
       .references(() => players.id, { onDelete: "cascade" }),
     rating: integer("rating"),
     federation: varchar("federation", { length: 3 }),
+    groupName: varchar("group_name", { length: 120 }),
+    club: varchar("club", { length: 200 }),
+    tournamentDsuRating: integer("tournament_dsu_rating"),
+    tournamentFideRating: integer("tournament_fide_rating"),
+    registeredAtText: varchar("registered_at_text", { length: 120 }),
+    syncedAt: timestamp("synced_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [

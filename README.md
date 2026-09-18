@@ -75,6 +75,37 @@ FIXTURE_SEED_TARGET=preview npm run db:seed:task-003
 
 `DATABASE_URL` must point at the intended migrated Preview database. The loader refuses to run without the explicit Preview target flag and must never be pointed at Production. See `docs/fixture-data.md` for the seeded tournament, players, games, safety rules, and validation steps.
 
+## Tournament synchronization
+
+The tournament sync keeps an authoritative local participant snapshot in `data/participants.json` (gitignored), refreshes current DSU and FIDE ratings, reconciles the active tournament roster, extracts each participant's Danbase games, and uploads the resulting PGN packs. It is safe to run repeatedly: removed participants leave only the tournament roster, while global players and games remain; existing games are deduplicated.
+
+Run the complete workflow:
+
+```bash
+npm run sync-tournament -- --url "https://turnering.skak.dk/TournamentActive/Details?tourId=..."
+```
+
+The tournament URL is saved in the local snapshot, so later runs only need:
+
+```bash
+npm run sync-tournament
+```
+
+Individual stages are also available:
+
+```bash
+npm run sync-participants # refresh additions/removals from the tournament site
+npm run sync-ratings      # refresh both DSU and FIDE ratings in the local file
+npm run sync-dsu
+npm run sync-fide
+npm run sync-app          # reconcile the local file with the active app tournament
+npm run sync-games        # scan Danbase once, then upload one pack per participant
+```
+
+Defaults are `C:\dev\danbase.pgn`, `data/participants.json`, `packs/`, and the Production app URL. Override them with `--danbase`, `--file`, `--packs-dir`, and `--app-url`. New tournaments are inactive; use **Make active** on `/admin` before syncing one. Only one tournament can be active.
+
+If Danbase uses an older spelling for a player, add a local `danbaseAliases` array to that player in the snapshot. Participant refreshes preserve this local field.
+
 ## Tests
 
 ```bash
@@ -111,4 +142,4 @@ No custom domain or custom deployment script is required for the current milesto
 
 ## Git workflow
 
-Create feature branches from `main`, open pull requests back into `main`, and let GitHub Actions plus the Vercel Preview deployment validate changes before merging.
+This personal project normally commits directly to `main`; GitHub Actions and the Vercel Production deployment validate each push.

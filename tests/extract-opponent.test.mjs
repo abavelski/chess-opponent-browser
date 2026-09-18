@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   extractOpponentPgn,
+  extractOpponentPacks,
   normalizePlayerName,
   parseArguments,
 } from "../scripts/extract-opponent.mjs";
@@ -92,6 +93,25 @@ describe("local opponent PGN extraction", () => {
     expect(summary.matched).toBe(1);
     expect(output).toContain('[Event "Selected as White"]');
     expect(output).not.toContain('[Event "Selected by alias"]');
+  });
+
+  it("extracts separate opponent packs in one Danbase scan", async () => {
+    const { inputPath, outputPath } = await tempFiles();
+    const secondOutput = outputPath.replace("opponent.pgn", "second.pgn");
+    await writeFile(inputPath, databasePgn, "utf8");
+
+    const summary = await extractOpponentPacks({
+      inputPath,
+      opponents: [
+        { name: "Nielsen", names: ["Nielsen,Jens Ove Fries"], outputPath },
+        { name: "Someone", names: ["Someone Else"], outputPath: secondOutput },
+      ],
+    });
+
+    expect(summary.scanned).toBe(3);
+    expect(summary.opponents.map((opponent) => opponent.matched)).toEqual([1, 1]);
+    expect(await readFile(outputPath, "utf8")).toContain('Selected as White');
+    expect(await readFile(secondOutput, "utf8")).toContain('Not selected');
   });
 
   it("ends comments whose closing brace follows a backslash", async () => {

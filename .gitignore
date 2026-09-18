@@ -35,3 +35,7 @@ next-env.d.ts
 # local extracted opponent packs
 /packs/*
 !/packs/.gitkeep
+
+# local tournament snapshots
+/data/*
+!/data/.gitkeep

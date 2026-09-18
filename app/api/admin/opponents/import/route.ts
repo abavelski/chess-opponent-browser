@@ -1,4 +1,4 @@
-import { desc } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getDb } from "@/lib/db";
@@ -104,11 +104,11 @@ export async function POST(request: Request) {
     const [activeTournament] = await db
       .select({ id: tournaments.id, name: tournaments.name })
       .from(tournaments)
-      .orderBy(desc(tournaments.createdAt), desc(tournaments.id))
+      .where(eq(tournaments.isActive, true))
       .limit(1);
 
     if (!activeTournament) {
-      return errorResponse("No tournament exists. Create one before importing opponents.", 409);
+      return errorResponse("No active tournament exists. Activate one before importing opponents.", 409);
     }
 
     const result = await persistParsedImport(

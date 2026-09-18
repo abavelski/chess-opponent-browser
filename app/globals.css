@@ -345,8 +345,50 @@ input:focus-visible {
 
 /* Minimal tournament roster */
 .simple-tournament-shell {
-  width: min(100% - 2rem, 38rem);
+  width: min(100% - 2rem, 62rem);
   padding: 2.5rem 0;
+}
+
+.opponent-table-wrap {
+  overflow-x: auto;
+  border-top: 1px solid var(--border);
+}
+
+.opponent-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+.opponent-table th,
+.opponent-table td {
+  padding: 0.58rem 0.45rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.opponent-table th {
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.opponent-table .numeric-cell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.opponent-name-cell a {
+  color: var(--text);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.opponent-name-cell a:hover {
+  color: var(--accent);
+  text-decoration: underline;
 }
 
 .simple-tournament-header {
@@ -457,6 +499,31 @@ input:focus-visible {
   flex-wrap: wrap;
   gap: 0.75rem;
   margin-top: 0.45rem;
+}
+
+.admin-row-links form {
+  margin: 0;
+}
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
+.active-tournament-label {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 .admin-tournament-row .danger-button {

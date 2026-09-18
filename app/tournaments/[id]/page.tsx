@@ -1,9 +1,9 @@
-import { eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { getDb } from "@/lib/db";
-import { players, tournamentParticipants, tournaments } from "@/lib/db/schema";
+import { games, players, tournamentParticipants, tournaments } from "@/lib/db/schema";
 import { parseTournamentId } from "@/lib/tournaments/validation";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +21,15 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
   }
 
   let tournament: { id: number; name: string } | undefined;
-  let roster: Array<{ playerId: number; name: string }> = [];
+  let roster: Array<{
+    playerId: number;
+    name: string;
+    club: string | null;
+    group: string | null;
+    dsuRating: number | null;
+    fideRating: number | null;
+    gameCount: number;
+  }> = [];
 
   try {
     const db = getDb();
@@ -37,10 +45,19 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
         .select({
           playerId: players.id,
           name: players.name,
+          club: tournamentParticipants.club,
+          group: tournamentParticipants.groupName,
+          dsuRating: players.currentDsuRating,
+          fideRating: players.currentFideRating,
+          gameCount: sql<number>`(
+            select count(*) from ${games}
+            where ${games.whitePlayerId} = ${players.id} or ${games.blackPlayerId} = ${players.id}
+          )`,
         })
         .from(tournamentParticipants)
         .innerJoin(players, eq(tournamentParticipants.playerId, players.id))
-        .where(eq(tournamentParticipants.tournamentId, tournamentId));
+        .where(eq(tournamentParticipants.tournamentId, tournamentId))
+        .orderBy(desc(players.currentDsuRating), desc(players.currentFideRating), players.name);
     }
   } catch (error) {
     console.error("Failed to load tournament roster", error);
@@ -65,15 +82,36 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       {roster.length === 0 ? (
         <p className="simple-empty-copy">No opponents yet.</p>
       ) : (
-        <ul className="simple-opponent-list">
-          {roster.map((participant) => (
-            <li key={participant.playerId}>
-              <Link href={`/tournaments/${tournament.id}/players/${participant.playerId}`}>
-                {participant.name}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <div className="opponent-table-wrap">
+          <table className="opponent-table">
+            <thead>
+              <tr>
+                <th>Player</th>
+                <th>Club</th>
+                <th>Group</th>
+                <th className="numeric-cell">DSU</th>
+                <th className="numeric-cell">FIDE</th>
+                <th className="numeric-cell">Games</th>
+              </tr>
+            </thead>
+            <tbody>
+              {roster.map((participant) => (
+                <tr key={participant.playerId}>
+                  <td className="opponent-name-cell">
+                    <Link href={`/tournaments/${tournament.id}/players/${participant.playerId}`}>
+                      {participant.name}
+                    </Link>
+                  </td>
+                  <td>{participant.club ?? "–"}</td>
+                  <td>{participant.group ?? "–"}</td>
+                  <td className="numeric-cell">{participant.dsuRating ?? "–"}</td>
+                  <td className="numeric-cell">{participant.fideRating ?? "–"}</td>
+                  <td className="numeric-cell">{Number(participant.gameCount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </main>
   );

@@ -5,7 +5,7 @@ import { DeleteTournamentForm } from "@/app/tournaments/[id]/delete-tournament-f
 import { getDb } from "@/lib/db";
 import { tournaments } from "@/lib/db/schema";
 
-import { renameTournament } from "./actions";
+import { activateTournament, renameTournament } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +14,7 @@ type RenameError = "required" | "too_long" | "database";
 type AdminPageProps = {
   searchParams: Promise<{
     deleteError?: string;
+    activateError?: string;
     renameError?: RenameError;
     tournamentId?: string;
   }>;
@@ -27,14 +28,14 @@ function renameErrorMessage(error: RenameError | undefined) {
 }
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
-  const { deleteError, renameError, tournamentId: renameTournamentId } = await searchParams;
+  const { activateError, deleteError, renameError, tournamentId: renameTournamentId } = await searchParams;
   const renameMessage = renameErrorMessage(renameError);
-  let tournamentRows: Array<{ id: number; name: string }> = [];
+  let tournamentRows: Array<{ id: number; name: string; isActive: boolean }> = [];
   let loadError = false;
 
   try {
     tournamentRows = await getDb()
-      .select({ id: tournaments.id, name: tournaments.name })
+      .select({ id: tournaments.id, name: tournaments.name, isActive: tournaments.isActive })
       .from(tournaments)
       .orderBy(desc(tournaments.createdAt), desc(tournaments.id));
   } catch (error) {
@@ -57,6 +58,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
       {deleteError === "database" ? (
         <p className="simple-load-error">Tournament could not be deleted.</p>
+      ) : null}
+
+      {activateError === "database" ? (
+        <p className="simple-load-error">Active tournament could not be changed.</p>
       ) : null}
 
       <nav aria-label="Administration" className="admin-links">
@@ -96,6 +101,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 ) : null}
 
                 <div className="admin-row-links">
+                  {tournament.isActive ? (
+                    <span className="active-tournament-label">Active</span>
+                  ) : (
+                    <form action={activateTournament}>
+                      <input name="tournamentId" type="hidden" value={tournament.id} />
+                      <button className="link-button" type="submit">Make active</button>
+                    </form>
+                  )}
                   <Link href={`/tournaments/${tournament.id}`}>Open</Link>
                   <Link href={`/imports/new?tournamentId=${tournament.id}`}>Import games</Link>
                   <Link href={`/tournaments/${tournament.id}/opponents/new`}>Add opponent</Link>
