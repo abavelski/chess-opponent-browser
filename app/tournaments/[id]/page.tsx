@@ -5,12 +5,15 @@ import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { players, tournamentParticipants, tournaments } from "@/lib/db/schema";
 import { normalizeRosterSearch } from "@/lib/players/validation";
+import { parseTournamentId } from "@/lib/tournaments/validation";
+
+import { DeleteTournamentForm } from "./delete-tournament-form";
 
 export const dynamic = "force-dynamic";
 
 type TournamentPageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; deleteError?: string }>;
 };
 
 type TournamentDetail = {
@@ -29,7 +32,7 @@ function parseTournamentId(value: string) {
 
 export default async function TournamentPage({ params, searchParams }: TournamentPageProps) {
   const { id: rawId } = await params;
-  const { q: rawQuery } = await searchParams;
+  const { q: rawQuery, deleteError } = await searchParams;
   const tournamentId = parseTournamentId(rawId);
 
   if (tournamentId === null) {
@@ -109,6 +112,13 @@ export default async function TournamentPage({ params, searchParams }: Tournamen
         <Link className="back-link" href="/">
           ← Preparation workspaces
         </Link>
+      ) : null}
+
+      {deleteError === "database" ? (
+        <section className="panel empty-state" role="alert">
+          <h2>Tournament could not be deleted</h2>
+          <p>No changes were made. Try again, or check the database health if the problem continues.</p>
+        </section>
       ) : null}
 
       <header className="page-header">
@@ -224,6 +234,19 @@ export default async function TournamentPage({ params, searchParams }: Tournamen
               Create another tournament
             </Link>
           </div>
+        </div>
+
+        <div className="panel empty-state danger-panel">
+          <p className="eyebrow danger-eyebrow">Danger zone</p>
+          <h3>Delete this tournament</h3>
+          <p className="muted">
+            This removes the preparation workspace and its opponent roster. Canonical Players,
+            Games, aliases, and import history are kept.
+          </p>
+          <DeleteTournamentForm
+            tournamentId={tournament.id}
+            tournamentName={tournament.name}
+          />
         </div>
       </section>
     </main>
