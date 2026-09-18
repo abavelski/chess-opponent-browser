@@ -21,15 +21,6 @@ type TournamentDetail = {
   name: string;
 };
 
-function parseTournamentId(value: string) {
-  if (!/^[1-9]\d*$/.test(value)) {
-    return null;
-  }
-
-  const id = Number(value);
-  return Number.isSafeInteger(id) ? id : null;
-}
-
 export default async function TournamentPage({ params, searchParams }: TournamentPageProps) {
   const { id: rawId } = await params;
   const { q: rawQuery, deleteError } = await searchParams;
