@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   TOURNAMENT_NAME_MAX_LENGTH,
+  parseTournamentId,
   validateTournamentName,
 } from "../lib/tournaments/validation";
 
@@ -40,5 +41,22 @@ describe("validateTournamentName", () => {
       success: false,
       error: "required",
     });
+  });
+});
+
+describe("parseTournamentId", () => {
+  it("accepts positive safe integer ids", () => {
+    expect(parseTournamentId("1")).toBe(1);
+    expect(parseTournamentId("42")).toBe(42);
+  });
+
+  it("rejects malformed, zero, negative, and unsafe ids", () => {
+    expect(parseTournamentId(null)).toBeNull();
+    expect(parseTournamentId("")).toBeNull();
+    expect(parseTournamentId("0")).toBeNull();
+    expect(parseTournamentId("-1")).toBeNull();
+    expect(parseTournamentId("1.5")).toBeNull();
+    expect(parseTournamentId(" 1 ")).toBeNull();
+    expect(parseTournamentId(String(Number.MAX_SAFE_INTEGER + 1))).toBeNull();
   });
 });

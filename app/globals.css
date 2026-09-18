@@ -130,6 +130,29 @@ p {
   border-color: var(--accent-strong);
 }
 
+.button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.danger-button {
+  border-color: var(--danger);
+  background: var(--danger);
+}
+
+.danger-button:hover {
+  border-color: #7f1d1d;
+  background: #7f1d1d;
+}
+
+.danger-panel {
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+}
+
+.danger-eyebrow {
+  color: var(--danger);
+}
+
 .button:focus-visible,
 .text-link:focus-visible,
 .back-link:focus-visible,

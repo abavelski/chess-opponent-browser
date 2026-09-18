@@ -25,3 +25,12 @@ export function validateTournamentName(
 
   return { success: true, name };
 }
+
+export function parseTournamentId(input: unknown) {
+  if (typeof input !== "string" || !/^[1-9]\d*$/.test(input)) {
+    return null;
+  }
+
+  const id = Number(input);
+  return Number.isSafeInteger(id) ? id : null;
+}
