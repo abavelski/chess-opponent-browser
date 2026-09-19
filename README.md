@@ -77,7 +77,7 @@ FIXTURE_SEED_TARGET=preview npm run db:seed:task-003
 
 ## Tournament synchronization
 
-The tournament sync keeps an authoritative local participant snapshot in `data/participants.json` (gitignored), refreshes current DSU and FIDE ratings, reconciles the active tournament roster, extracts each participant's Danbase games, and uploads the resulting PGN packs. It is safe to run repeatedly: removed participants leave only the tournament roster, while global players and games remain; existing games are deduplicated.
+The tournament sync keeps an authoritative local participant snapshot in `data/participants.json` (gitignored), reconciles the active tournament roster, extracts each participant's Danbase games, and uploads the resulting PGN packs. It is safe to run repeatedly: removed participants leave only the tournament roster, while global players and games remain; existing games are deduplicated. The normal workflow preserves previously fetched ratings without requesting DSU or FIDE pages.
 
 Run the complete workflow:
 
@@ -85,10 +85,10 @@ Run the complete workflow:
 npm run sync-tournament -- furesoe-open-2026
 ```
 
-The existing `tourId=30447` URL is the first-run default, and the selected URL is saved in the local snapshot, so later runs only need:
+To explicitly refresh DSU and FIDE ratings as part of the complete workflow:
 
 ```bash
-npm run sync-tournament -- furesoe-open-2026
+npm run sync-tournament -- furesoe-open-2026 --ratings
 ```
 
 Individual stages are also available:

@@ -82,6 +82,7 @@ export function parseArguments(argv) {
     appUrl: process.env.OPPONENT_BROWSER_URL || DEFAULT_APP_URL,
     packsDir: "packs",
     throttleMs: 2500,
+    includeRatings: false,
     help: false,
   };
 
@@ -94,6 +95,7 @@ export function parseArguments(argv) {
   for (; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === "--help" || argument === "-h") options.help = true;
+    else if (argument === "--ratings") options.includeRatings = true;
     else if (["--file", "-f", "--url", "-u", "--danbase", "--input", "-i", "--app-url", "--packs-dir", "--throttle"].includes(argument)) {
       const value = argv[++index];
       if (!value) throw new Error(`${argument} requires a value.`);
@@ -393,7 +395,7 @@ export async function syncGames(options) {
 }
 
 function usage() {
-  return `Synchronize a Danish tournament, ratings, and Danbase games.\n\nUsage:\n  npm run sync-tournament -- <nickname>\n  npm run sync-participants -- <nickname>\n  npm run sync-ratings -- <nickname>\n  npm run sync-app -- <nickname>\n  npm run sync-games -- <nickname>\n\nThe nickname loads the active tournament URL and optional group from the app.\nOmit it to use the active tournament directly.\n\nCommands: all, participants, dsu, fide, ratings, app, games\nOptions:\n  -f, --file <path>       Local snapshot (default: ${DEFAULT_SNAPSHOT})\n  -u, --url <url>         Override the saved tournament URL for this run\n      --danbase <path>    Danbase PGN (default: ${DEFAULT_DANBASE})\n      --app-url <url>     Target app (default: OPPONENT_BROWSER_URL or Production)\n      --packs-dir <path>  Local PGN packs (default: packs)\n      --throttle <ms>     Delay between rating pages (default: 2500)\n`;
+  return `Synchronize a Danish tournament and its Danbase games.\n\nUsage:\n  npm run sync-tournament -- <nickname>\n  npm run sync-tournament -- <nickname> --ratings\n  npm run sync-participants -- <nickname>\n  npm run sync-ratings -- <nickname>\n  npm run sync-app -- <nickname>\n  npm run sync-games -- <nickname>\n\nThe nickname loads the active tournament URL and optional group from the app.\nOmit it to use the active tournament directly. Rating updates are skipped by\nthe normal full sync unless --ratings is specified.\n\nCommands: all, participants, dsu, fide, ratings, app, games\nOptions:\n  -f, --file <path>       Local snapshot (default: ${DEFAULT_SNAPSHOT})\n  -u, --url <url>         Override the saved tournament URL for this run\n      --ratings           Refresh DSU and FIDE ratings during a full sync\n      --danbase <path>    Danbase PGN (default: ${DEFAULT_DANBASE})\n      --app-url <url>     Target app (default: OPPONENT_BROWSER_URL or Production)\n      --packs-dir <path>  Local PGN packs (default: packs)\n      --throttle <ms>     Delay between rating pages (default: 2500)\n`;
 }
 
 export async function main(argv = process.argv.slice(2)) {
@@ -407,7 +409,7 @@ export async function main(argv = process.argv.slice(2)) {
   if (options.command === "games") return syncGames(options);
 
   await refreshParticipants(options);
-  await refreshRatings(options, ["dsu", "fide"]);
+  if (options.includeRatings) await refreshRatings(options, ["dsu", "fide"]);
   await syncApp(options);
   await syncGames(options);
 }

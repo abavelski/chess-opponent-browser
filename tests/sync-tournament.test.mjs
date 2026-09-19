@@ -6,6 +6,7 @@ describe("tournament sync CLI", () => {
   it("uses the local Danbase path and local snapshot defaults", () => {
     expect(parseArguments([])).toMatchObject({
       command: "all",
+      includeRatings: false,
       snapshotPath: "data/participants.json",
       danbasePath: "C:/dev/danbase.pgn",
     });
@@ -14,6 +15,12 @@ describe("tournament sync CLI", () => {
   it("parses subcommands and overrides", () => {
     expect(parseArguments(["app", "furesoe-open", "--file", "other.json", "--app-url", "http://localhost:3000"]))
       .toMatchObject({ command: "app", nickname: "furesoe-open", snapshotPath: "other.json", appUrl: "http://localhost:3000" });
+  });
+
+  it("only includes rating refreshes in full sync when explicitly requested", () => {
+    expect(parseArguments(["all", "furesoe-open"])).toMatchObject({ includeRatings: false });
+    expect(parseArguments(["all", "furesoe-open", "--ratings"]))
+      .toMatchObject({ includeRatings: true });
   });
 
   it("filters participant groups case-insensitively", () => {
