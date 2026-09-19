@@ -39,4 +39,10 @@ describe("parseParticipantSnapshot", () => {
       { name: "B", fideId: "42" },
     ] })).toThrow("Duplicate FIDE ID 42");
   });
+
+  it("removes a tournament seed number from player names", () => {
+    expect(parseParticipantSnapshot({
+      players: [{ name: "19. Nikolaj Bavelski", dsuId: "100105169" }],
+    }).players[0].name).toBe("Nikolaj Bavelski");
+  });
 });

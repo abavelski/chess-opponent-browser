@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { danbaseNameVariants, filterParticipantsByGroup, identityKeys, mergeParticipants, parseArguments, toRating } from "../scripts/sync-tournament.mjs";
+import { danbaseNameVariants, filterParticipantsByGroup, identityKeys, mergeParticipants, normalizeParticipantName, parseArguments, toRating } from "../scripts/sync-tournament.mjs";
 
 describe("tournament sync CLI", () => {
   it("uses the local Danbase path and local snapshot defaults", () => {
@@ -39,5 +39,10 @@ describe("tournament sync CLI", () => {
   it("generates Danbase surname-first variants and removes titles", () => {
     expect(danbaseNameVariants("CM Karl Emil Nielsen-Refs")).toContain("Nielsen-Refs, Karl Emil");
     expect(danbaseNameVariants("Luis Alzaga")).toContain("Alzaga,Luis");
+  });
+
+  it("removes tournament seed numbers from participant names and Danbase variants", () => {
+    expect(normalizeParticipantName("  19.   Nikolaj Bavelski ")).toBe("Nikolaj Bavelski");
+    expect(danbaseNameVariants("19. Nikolaj Bavelski")).toContain("Bavelski, Nikolaj");
   });
 });

@@ -19,6 +19,14 @@ export function toRating(value) {
   return rating && rating >= 1 && rating <= 4000 ? rating : null;
 }
 
+export function normalizeParticipantName(value) {
+  return String(value ?? "")
+    .normalize("NFKC")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/^\d+\.\s*/, "");
+}
+
 export function identityKeys(player) {
   const clean = (value) => String(value ?? "").normalize("NFKC").trim().toLowerCase();
   return [
@@ -30,7 +38,7 @@ export function identityKeys(player) {
 }
 
 export function danbaseNameVariants(name) {
-  const canonical = String(name ?? "").normalize("NFKC").trim().replace(/\s+/g, " ");
+  const canonical = normalizeParticipantName(name);
   const withoutTitle = canonical.replace(/^(?:GM|IM|FM|CM|WGM|WIM|WFM|WCM)\s+/i, "");
   const variants = new Set([canonical, withoutTitle]);
   const parts = withoutTitle.split(" ");
@@ -211,6 +219,7 @@ async function extractAllParticipants(page) {
     for (const raw of await extractVisibleParticipants(page)) {
       const player = {
         ...raw,
+        name: normalizeParticipantName(raw.name),
         tournamentDsuRating: toRating(raw.tournamentDsuRating),
         tournamentFideRating: toRating(raw.tournamentFideRating),
         actualDsuRating: null,
@@ -344,20 +353,24 @@ export async function syncGames(options) {
   await mkdir(outputDirectory, { recursive: true });
   const extraction = await extractOpponentPacks({
     inputPath: options.danbasePath,
-    opponents: snapshot.players.map((player) => ({
-      name: player.name,
-      names: [
-        ...danbaseNameVariants(player.name),
-        ...(Array.isArray(player.danbaseAliases) ? player.danbaseAliases : []),
-      ],
-      outputPath: join(outputDirectory, packFilename(player.name)),
-    })),
+    opponents: snapshot.players.map((player) => {
+      const name = normalizeParticipantName(player.name);
+      return {
+        name,
+        names: [
+          ...danbaseNameVariants(name),
+          ...(Array.isArray(player.danbaseAliases) ? player.danbaseAliases : []),
+        ],
+        outputPath: join(outputDirectory, packFilename(name)),
+      };
+    }),
   });
   process.stdout.write(`Scanned ${extraction.scanned} Danbase games once for ${snapshot.players.length} participants.\n`);
 
   let failures = 0;
   for (const [index, player] of snapshot.players.entries()) {
-    process.stdout.write(`Games ${index + 1}/${snapshot.players.length}: ${player.name}\n`);
+    const name = normalizeParticipantName(player.name);
+    process.stdout.write(`Games ${index + 1}/${snapshot.players.length}: ${name}\n`);
     const pack = extraction.opponents[index];
     try {
       if (!pack || pack.matched === 0) {
@@ -365,8 +378,8 @@ export async function syncGames(options) {
       } else {
         const uploaded = await uploadPack({
           baseUrl: options.appUrl,
-          name: player.name,
-          aliases: danbaseNameVariants(player.name),
+          name,
+          aliases: danbaseNameVariants(name),
           packPath: pack.outputPath,
         });
         process.stdout.write(`  ${uploaded.import.importedCount} new, ${uploaded.import.duplicateCount} duplicate.\n`);

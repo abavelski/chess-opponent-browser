@@ -31,6 +31,11 @@ function optionalText(value: unknown, maxLength: number) {
   return text;
 }
 
+function participantName(value: unknown) {
+  const name = optionalText(value, 200)?.replace(/^\d+\.\s*/, "") ?? null;
+  return name || null;
+}
+
 function rating(value: unknown) {
   if (value === null || value === undefined || value === "") return null;
   if (!Number.isInteger(value) || Number(value) < 1 || Number(value) > 4000) {
@@ -66,7 +71,7 @@ export function parseParticipantSnapshot(value: unknown): ParticipantSnapshot {
   const players = input.players.map((raw, index) => {
     if (!raw || typeof raw !== "object") throw new Error(`Player ${index + 1} is invalid.`);
     const player = raw as Record<string, unknown>;
-    const name = optionalText(player.name, 200);
+    const name = participantName(player.name);
     if (!name) throw new Error(`Player ${index + 1} has no name.`);
 
     return {
