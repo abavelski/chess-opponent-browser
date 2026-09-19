@@ -139,6 +139,7 @@ export default async function TournamentPage({ params, searchParams }: Tournamen
           <table className="opponent-table">
             <thead>
               <tr>
+                <th className="row-number-cell" scope="col">#</th>
                 <SortableHeader label="Player" column="name" tournamentId={tournament.id} currentSort={sort} currentOrder={order} />
                 <SortableHeader label="Club" column="club" tournamentId={tournament.id} currentSort={sort} currentOrder={order} />
                 <SortableHeader label="Group" column="group" tournamentId={tournament.id} currentSort={sort} currentOrder={order} />
@@ -148,8 +149,9 @@ export default async function TournamentPage({ params, searchParams }: Tournamen
               </tr>
             </thead>
             <tbody>
-              {roster.map((participant) => (
+              {roster.map((participant, index) => (
                 <tr key={participant.playerId}>
+                  <td className="row-number-cell">{index + 1}</td>
                   <td className="opponent-name-cell">
                     <Link href={`/tournaments/${tournament.id}/players/${participant.playerId}`}>
                       {participant.name}

@@ -26,6 +26,7 @@ export function DeleteTournamentForm({
   return (
     <form
       action={deleteTournament}
+      className="admin-delete-form"
       onSubmit={(event) => {
         const confirmed = window.confirm(
           `Delete “${tournamentName}”?\n\nThis removes the tournament workspace and its opponent roster. Players, games, and import history are kept.`,
