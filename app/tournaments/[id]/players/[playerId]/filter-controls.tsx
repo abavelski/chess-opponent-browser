@@ -16,6 +16,13 @@ type FilterSelectProps = {
   options: Array<{ value: string; label: string }>;
 };
 
+type RatingInputProps = {
+  id: string;
+  label: string;
+  name: string;
+  value: number | null;
+};
+
 function FilterSelect({ id, label, name, value, options }: FilterSelectProps) {
   return (
     <label className="compact-filter-field" htmlFor={id}>
@@ -31,6 +38,25 @@ function FilterSelect({ id, label, name, value, options }: FilterSelectProps) {
   );
 }
 
+function RatingInput({ id, label, name, value }: RatingInputProps) {
+  return (
+    <label className="compact-filter-field" htmlFor={id}>
+      <span>{label}</span>
+      <input
+        defaultValue={value ?? ""}
+        id={id}
+        inputMode="numeric"
+        key={`${name}:${value ?? ""}`}
+        max={4000}
+        min={1}
+        name={name}
+        placeholder="Any"
+        type="number"
+      />
+    </label>
+  );
+}
+
 export function GameFilterControls({
   action,
   value,
@@ -41,7 +67,9 @@ export function GameFilterControls({
       action={action}
       className="compact-game-filters"
       method="get"
-      onChange={(event) => event.currentTarget.requestSubmit()}
+      onChange={(event) => {
+        if (event.target instanceof HTMLSelectElement) event.currentTarget.requestSubmit();
+      }}
     >
       <FilterSelect
         id="game-color-filter"
@@ -67,6 +95,19 @@ export function GameFilterControls({
         ]}
         value={value.date}
       />
+      <RatingInput
+        id="game-min-rating-filter"
+        label="Min rating"
+        name="minRating"
+        value={value.minRating}
+      />
+      <RatingInput
+        id="game-max-rating-filter"
+        label="Max rating"
+        name="maxRating"
+        value={value.maxRating}
+      />
+
       <FilterSelect
         id="game-sort-filter"
         label="Sort"
@@ -79,11 +120,9 @@ export function GameFilterControls({
         value={value.sort}
       />
 
-      <noscript>
-        <button className="button secondary-button compact-filter-submit" type="submit">
-          Apply
-        </button>
-      </noscript>
+      <button className="button secondary-button compact-filter-submit" type="submit">
+        Apply
+      </button>
 
       {showReset ? (
         <a className="text-link compact-filter-reset" href={action}>

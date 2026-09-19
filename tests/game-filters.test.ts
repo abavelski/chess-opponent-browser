@@ -16,7 +16,8 @@ describe("game filter URL parsing", () => {
         {
           color: "purple",
           date: "forever",
-          rating: "9999",
+          minRating: "9999",
+          maxRating: "nope",
           result: "unknown",
           source: "missing-source",
           sort: "random",
@@ -32,7 +33,8 @@ describe("game filter URL parsing", () => {
         {
           color: "black",
           date: "2y",
-          rating: "2000",
+          minRating: "1800",
+          maxRating: "2200",
           result: "win",
           source: "fixture-archive",
           sort: "strongest",
@@ -42,7 +44,8 @@ describe("game filter URL parsing", () => {
     ).toEqual({
       color: "black",
       date: "2y",
-      rating: "2000",
+      minRating: 1800,
+      maxRating: 2200,
       result: "win",
       source: "fixture-archive",
       sort: "strongest",
@@ -84,7 +87,8 @@ describe("game filter query plan", () => {
         {
           color: "white",
           date: "2y",
-          rating: "2200",
+          minRating: 1800,
+          maxRating: 2200,
           result: "loss",
           source: "fixture-manual",
           sort: "strongest",
@@ -94,7 +98,8 @@ describe("game filter query plan", () => {
     ).toEqual({
       color: "white",
       minPlayedOn: "2024-09-16",
-      minOpponentRating: 2200,
+      minOpponentRating: 1800,
+      maxOpponentRating: 2200,
       whiteResult: "0-1",
       blackResult: "1-0",
       sourceKey: "fixture-manual",
@@ -106,13 +111,15 @@ describe("game filter query plan", () => {
     const plan = buildGameFilterPlan(defaultGameFilters, now);
     expect(plan.minPlayedOn).toBeNull();
     expect(plan.minOpponentRating).toBeNull();
+    expect(plan.maxOpponentRating).toBeNull();
 
     const boundedPlan = buildGameFilterPlan(
-      { ...defaultGameFilters, date: "1y", rating: "1800" },
+      { ...defaultGameFilters, date: "1y", minRating: 1800, maxRating: 2400 },
       now,
     );
     expect(boundedPlan.minPlayedOn).toBe("2025-09-16");
     expect(boundedPlan.minOpponentRating).toBe(1800);
+    expect(boundedPlan.maxOpponentRating).toBe(2400);
   });
 
   it("detects whether reset should be available", () => {

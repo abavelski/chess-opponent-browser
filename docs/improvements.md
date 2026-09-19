@@ -1,8 +1,6 @@
-1. We need to keep tournament URL details somewhere. Lets say I should be able to create a new tournament and add a URL there, in addition to the name. It should also be modifiable.
-I would also add a tournament nickname. And when I want to sync from local machine, script could take the nickname as parameter, fetch the tournament details and sync as it is doing now.
+UI improvements of the player details screen:
 
-2. I might be interested only in specific group. Add this to the tournament details as optional, if specified, fetch only the specified group. 
-
-3. Sync should delete those which are not required from the database. Lets say I made a mistake by importing all and only interested in U-14 group. I added the group, re-synced, all other groups should be deleted.
-
-4. List of the players needs sorting now. Default by dsu rating, descending, add options on the columns itself
+1. in the list of games, for each game add the rating of the opponents if known from PGN next to the names
+2. add filter on rating. The idea is to be able to filter out easily how the player plays aginst higher rated or lower rated opponents. So we need min and max rating filter for the games
+3. Make game moves on the right panel more readable. Similar to lichess analysis board, 2 columns for white and black moves, 1 move of white and black per line
+4. Since panel on the right become more narrow, make a board in the middle a bit larger

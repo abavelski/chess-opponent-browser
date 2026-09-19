@@ -7,6 +7,7 @@ import {
   findReplayLine,
   initialFen,
   nextSelection,
+  pairReplayMoves,
   previousSelection,
   selectionFen,
   startSelection,
@@ -93,6 +94,23 @@ describe("game viewer replay adapter", () => {
       san: "d4",
       comment: "Stored preparation comment.",
       variationLineIds: ["main.2.v0"],
+    });
+  });
+
+  it("pairs White and Black moves into notation rows", () => {
+    const main = findReplayLine(replay(), "main");
+    const rows = pairReplayMoves(main?.moves ?? []);
+
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toMatchObject({
+      moveNumber: 1,
+      white: { index: 0, move: { san: "e4" } },
+      black: { index: 1, move: { san: "c6" } },
+    });
+    expect(rows[2]).toMatchObject({
+      moveNumber: 3,
+      white: { index: 4, move: { san: "Nc3" } },
+      black: null,
     });
   });
 

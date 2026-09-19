@@ -1,4 +1,4 @@
-import { and, eq, gte, or, sql } from "drizzle-orm";
+import { and, eq, gte, lte, or, sql } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -30,6 +30,8 @@ type CompactGameItem = {
   id: number;
   whiteName: string;
   blackName: string;
+  whiteRating: number | null;
+  blackRating: number | null;
   date: string | null;
   result: string;
 };
@@ -60,6 +62,8 @@ function compactFilters(query: GameFilterQuery): GameFilterState {
     ...defaultGameFilters,
     color: parsed.color,
     date: parsed.date,
+    minRating: parsed.minRating,
+    maxRating: parsed.maxRating,
     sort: parsed.sort,
   };
 }
@@ -131,17 +135,24 @@ export default async function PlayerPage({ params, searchParams }: PlayerPagePro
       const dateCondition = plan.minPlayedOn
         ? gte(games.playedOn, plan.minPlayedOn)
         : undefined;
+      const opponentRating = sql<number>`case
+        when ${games.whitePlayerId} = ${playerId} then ${games.blackRating}
+        when ${games.blackPlayerId} = ${playerId} then ${games.whiteRating}
+        else null
+      end`;
+      const minRatingCondition = plan.minOpponentRating
+        ? gte(opponentRating, plan.minOpponentRating)
+        : undefined;
+      const maxRatingCondition = plan.maxOpponentRating
+        ? lte(opponentRating, plan.maxOpponentRating)
+        : undefined;
 
       const orderExpressions =
         plan.sort === "oldest"
           ? [sql`${games.playedOn} asc nulls last`, sql`${games.id} asc`]
           : plan.sort === "strongest"
             ? [
-                sql`case
-                  when ${games.whitePlayerId} = ${playerId} then ${games.blackRating}
-                  when ${games.blackPlayerId} = ${playerId} then ${games.whiteRating}
-                  else null
-                end desc nulls last`,
+                sql`${opponentRating} desc nulls last`,
                 sql`${games.playedOn} desc nulls last`,
                 sql`${games.id} desc`,
               ]
@@ -152,17 +163,27 @@ export default async function PlayerPage({ params, searchParams }: PlayerPagePro
           id: games.id,
           whiteName: games.whiteName,
           blackName: games.blackName,
+          whiteRating: games.whiteRating,
+          blackRating: games.blackRating,
           playedOn: games.playedOn,
           result: games.result,
         })
         .from(games)
-        .where(and(playerLinkCondition, colorCondition, dateCondition))
+        .where(and(
+          playerLinkCondition,
+          colorCondition,
+          dateCondition,
+          minRatingCondition,
+          maxRatingCondition,
+        ))
         .orderBy(...orderExpressions);
 
       gameItems = gameRows.map((game) => ({
         id: game.id,
         whiteName: game.whiteName,
         blackName: game.blackName,
+        whiteRating: game.whiteRating,
+        blackRating: game.blackRating,
         date: game.playedOn,
         result: game.result,
       }));
@@ -179,6 +200,8 @@ export default async function PlayerPage({ params, searchParams }: PlayerPagePro
             id: games.id,
             whiteName: games.whiteName,
             blackName: games.blackName,
+            whiteRating: games.whiteRating,
+            blackRating: games.blackRating,
             playedOn: games.playedOn,
             result: games.result,
             whitePlayerId: games.whitePlayerId,
@@ -195,6 +218,8 @@ export default async function PlayerPage({ params, searchParams }: PlayerPagePro
             id: row.id,
             whiteName: row.whiteName,
             blackName: row.blackName,
+            whiteRating: row.whiteRating,
+            blackRating: row.blackRating,
             date: row.playedOn,
             result: row.result,
             replay: buildReplayDocument(row.structuredMoves),
@@ -232,6 +257,8 @@ export default async function PlayerPage({ params, searchParams }: PlayerPagePro
 
     if (activeFilters.color !== "all") params.set("color", activeFilters.color);
     if (activeFilters.date !== "all") params.set("date", activeFilters.date);
+    if (activeFilters.minRating !== null) params.set("minRating", String(activeFilters.minRating));
+    if (activeFilters.maxRating !== null) params.set("maxRating", String(activeFilters.maxRating));
     if (activeFilters.sort !== "newest") params.set("sort", activeFilters.sort);
     params.set("game", String(gameId));
 
@@ -296,9 +323,15 @@ export default async function PlayerPage({ params, searchParams }: PlayerPagePro
                         href={gameHref(game.id)}
                       >
                         <span className="compact-game-names">
-                          <strong>{game.whiteName}</strong>
-                          <span aria-hidden="true">–</span>
-                          <strong>{game.blackName}</strong>
+                          <span className="compact-game-player">
+                            <strong>{game.whiteName}</strong>
+                            {game.whiteRating ? <small>{game.whiteRating}</small> : null}
+                          </span>
+                          <span aria-hidden="true" className="compact-game-separator">–</span>
+                          <span className="compact-game-player">
+                            <strong>{game.blackName}</strong>
+                            {game.blackRating ? <small>{game.blackRating}</small> : null}
+                          </span>
                         </span>
                         <span className="compact-game-meta">
                           <span>{game.date ?? "—"}</span>

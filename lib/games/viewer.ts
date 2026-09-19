@@ -25,6 +25,17 @@ export type ReplayMove = {
   variationLineIds: string[];
 };
 
+export type ReplayMoveEntry = {
+  move: ReplayMove;
+  index: number;
+};
+
+export type ReplayMoveRow = {
+  moveNumber: number;
+  white: ReplayMoveEntry | null;
+  black: ReplayMoveEntry | null;
+};
+
 export type ReplayLine = {
   id: string;
   parentLineId: string | null;
@@ -45,6 +56,21 @@ export type ReplaySelection = {
   lineId: string;
   index: number;
 };
+
+export function pairReplayMoves(moves: ReplayMove[]): ReplayMoveRow[] {
+  const rows: ReplayMoveRow[] = [];
+
+  for (const [index, move] of moves.entries()) {
+    let row = rows.at(-1);
+    if (!row || row.moveNumber !== move.moveNumber) {
+      row = { moveNumber: move.moveNumber, white: null, black: null };
+      rows.push(row);
+    }
+    row[move.side] = { move, index };
+  }
+
+  return rows;
+}
 
 export type BoardSquare = {
   square: string;

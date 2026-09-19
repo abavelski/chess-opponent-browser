@@ -1,13 +1,13 @@
 export type GameColorFilter = "all" | "white" | "black";
 export type GameDateFilter = "all" | "6m" | "1y" | "2y" | "5y";
-export type GameRatingFilter = "all" | "1800" | "2000" | "2200";
 export type GameResultFilter = "all" | "win" | "draw" | "loss";
 export type GameSort = "newest" | "oldest" | "strongest";
 
 export type GameFilterState = {
   color: GameColorFilter;
   date: GameDateFilter;
-  rating: GameRatingFilter;
+  minRating: number | null;
+  maxRating: number | null;
   result: GameResultFilter;
   source: string;
   sort: GameSort;
@@ -19,6 +19,7 @@ export type GameFilterPlan = {
   color: GameColorFilter;
   minPlayedOn: string | null;
   minOpponentRating: number | null;
+  maxOpponentRating: number | null;
   whiteResult: "1-0" | "0-1" | "1/2-1/2" | null;
   blackResult: "1-0" | "0-1" | "1/2-1/2" | null;
   sourceKey: string | null;
@@ -28,7 +29,8 @@ export type GameFilterPlan = {
 export const defaultGameFilters: GameFilterState = {
   color: "all",
   date: "all",
-  rating: "all",
+  minRating: null,
+  maxRating: null,
   result: "all",
   source: "all",
   sort: "newest",
@@ -36,7 +38,6 @@ export const defaultGameFilters: GameFilterState = {
 
 const colorValues = new Set<GameColorFilter>(["all", "white", "black"]);
 const dateValues = new Set<GameDateFilter>(["all", "6m", "1y", "2y", "5y"]);
-const ratingValues = new Set<GameRatingFilter>(["all", "1800", "2000", "2200"]);
 const resultValues = new Set<GameResultFilter>(["all", "win", "draw", "loss"]);
 const sortValues = new Set<GameSort>(["newest", "oldest", "strongest"]);
 
@@ -53,6 +54,13 @@ function enumValue<T extends string>(
   return candidate && allowed.has(candidate as T) ? (candidate as T) : fallback;
 }
 
+function ratingValue(value: string | string[] | undefined) {
+  const candidate = firstValue(value);
+  if (!candidate || !/^\d{1,4}$/.test(candidate)) return null;
+  const rating = Number(candidate);
+  return rating >= 1 && rating <= 4000 ? rating : null;
+}
+
 export function parseGameFilters(
   query: GameFilterQuery,
   availableSourceKeys: readonly string[],
@@ -62,7 +70,8 @@ export function parseGameFilters(
   return {
     color: enumValue(query.color, colorValues, defaultGameFilters.color),
     date: enumValue(query.date, dateValues, defaultGameFilters.date),
-    rating: enumValue(query.rating, ratingValues, defaultGameFilters.rating),
+    minRating: ratingValue(query.minRating),
+    maxRating: ratingValue(query.maxRating),
     result: enumValue(query.result, resultValues, defaultGameFilters.result),
     source:
       sourceCandidate && availableSourceKeys.includes(sourceCandidate)
@@ -125,7 +134,8 @@ export function buildGameFilterPlan(state: GameFilterState, now = new Date()): G
   return {
     color: state.color,
     minPlayedOn: dateCutoffForFilter(state.date, now),
-    minOpponentRating: state.rating === "all" ? null : Number(state.rating),
+    minOpponentRating: state.minRating,
+    maxOpponentRating: state.maxRating,
     whiteResult: resultCodes.white,
     blackResult: resultCodes.black,
     sourceKey: state.source === "all" ? null : state.source,
@@ -137,7 +147,8 @@ export function hasActiveGameFilters(state: GameFilterState) {
   return (
     state.color !== defaultGameFilters.color ||
     state.date !== defaultGameFilters.date ||
-    state.rating !== defaultGameFilters.rating ||
+    state.minRating !== defaultGameFilters.minRating ||
+    state.maxRating !== defaultGameFilters.maxRating ||
     state.result !== defaultGameFilters.result ||
     state.source !== defaultGameFilters.source ||
     state.sort !== defaultGameFilters.sort

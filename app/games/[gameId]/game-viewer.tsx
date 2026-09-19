@@ -7,11 +7,13 @@ import {
   endSelection,
   findReplayLine,
   nextSelection,
+  pairReplayMoves,
   previousSelection,
   selectionFen,
   startSelection,
   type ReplayDocument,
   type ReplaySelection,
+  type ReplayMoveEntry,
 } from "@/lib/games/viewer";
 
 type GameViewerProps = {
@@ -49,37 +51,76 @@ function NotationLine({ replay, lineId, selected, onSelect, depth = 0 }: Notatio
 
   return (
     <div className={depth === 0 ? "notation-line" : "notation-line variation-line"}>
-      {line.moves.map((move, index) => {
-        const isSelected = selected.lineId === line.id && selected.index === index;
-        return (
-          <div className="notation-node" key={move.id}>
-            <button
-              aria-current={isSelected ? "step" : undefined}
-              className={`notation-move${isSelected ? " is-current" : ""}`}
-              onClick={() => onSelect({ lineId: line.id, index })}
-              type="button"
-            >
-              <span className="notation-number">{notationPrefix(move.moveNumber, move.side)}</span>
-              <span>{move.san}</span>
-            </button>
+      {pairReplayMoves(line.moves).map((row) => (
+        <div className="notation-row" key={`${line.id}:${row.moveNumber}`}>
+          <span className="notation-number">{row.moveNumber}.</span>
+          <NotationMoveCell
+            depth={depth}
+            entry={row.white}
+            lineId={line.id}
+            onSelect={onSelect}
+            replay={replay}
+            selected={selected}
+          />
+          <NotationMoveCell
+            depth={depth}
+            entry={row.black}
+            lineId={line.id}
+            onSelect={onSelect}
+            replay={replay}
+            selected={selected}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
 
-            {move.comment ? <p className="move-comment">{move.comment}</p> : null}
+function NotationMoveCell({
+  replay,
+  lineId,
+  entry,
+  selected,
+  onSelect,
+  depth,
+}: {
+  replay: ReplayDocument;
+  lineId: string;
+  entry: ReplayMoveEntry | null;
+  selected: ReplaySelection;
+  onSelect: (selection: ReplaySelection) => void;
+  depth: number;
+}) {
+  if (!entry) return <span aria-hidden="true" className="notation-cell notation-cell-empty" />;
+  const { move, index } = entry;
+  const isSelected = selected.lineId === lineId && selected.index === index;
 
-            {move.variationLineIds.map((variationLineId) => (
-              <div className="variation-block" key={variationLineId}>
-                <span className="variation-label">Variation</span>
-                <NotationLine
-                  depth={depth + 1}
-                  lineId={variationLineId}
-                  onSelect={onSelect}
-                  replay={replay}
-                  selected={selected}
-                />
-              </div>
-            ))}
-          </div>
-        );
-      })}
+  return (
+    <div className="notation-cell">
+      <button
+        aria-current={isSelected ? "step" : undefined}
+        aria-label={`${notationPrefix(move.moveNumber, move.side)} ${move.san}`}
+        className={`notation-move${isSelected ? " is-current" : ""}`}
+        onClick={() => onSelect({ lineId, index })}
+        type="button"
+      >
+        {move.san}
+      </button>
+
+      {move.comment ? <p className="move-comment">{move.comment}</p> : null}
+
+      {move.variationLineIds.map((variationLineId) => (
+        <div className="variation-block" key={variationLineId}>
+          <span className="variation-label">Variation</span>
+          <NotationLine
+            depth={depth + 1}
+            lineId={variationLineId}
+            onSelect={onSelect}
+            replay={replay}
+            selected={selected}
+          />
+        </div>
+      ))}
     </div>
   );
 }
