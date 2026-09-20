@@ -46,6 +46,28 @@ export const tournaments = pgTable(
   ],
 );
 
+export const syncRuns = pgTable(
+  "sync_runs",
+  {
+    id: serial("id").primaryKey(),
+    tournamentId: integer("tournament_id")
+      .notNull()
+      .references(() => tournaments.id, { onDelete: "cascade" }),
+    kind: varchar("kind", { length: 24 }).notNull(),
+    status: varchar("status", { length: 24 }).default("running").notNull(),
+    snapshotHash: varchar("snapshot_hash", { length: 64 }),
+    summaryJson: jsonb("summary_json").$type<Record<string, unknown>>(),
+    errorText: text("error_text"),
+    startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("sync_runs_tournament_started_at_idx").on(table.tournamentId, table.startedAt),
+    check("sync_runs_kind_valid", sql`${table.kind} in ('participants', 'ratings', 'games', 'full')`),
+    check("sync_runs_status_valid", sql`${table.status} in ('running', 'completed', 'completed_with_errors', 'failed')`),
+  ],
+);
+
 export const players = pgTable(
   "players",
   {
@@ -58,6 +80,8 @@ export const players = pgTable(
     dsuProfileUrl: text("dsu_profile_url"),
     fideProfileUrl: text("fide_profile_url"),
     ratingsUpdatedAt: timestamp("ratings_updated_at", { withTimezone: true }),
+    dsuRatingUpdatedAt: timestamp("dsu_rating_updated_at", { withTimezone: true }),
+    fideRatingUpdatedAt: timestamp("fide_rating_updated_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [

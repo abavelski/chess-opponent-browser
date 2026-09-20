@@ -20,6 +20,8 @@ describe("parseParticipantSnapshot", () => {
         tournamentFideRating: 1850,
         actualDsuRating: 1912,
         actualFideRating: 1864,
+        dsuRatingUpdatedAt: "2026-09-18T10:00:00Z",
+        fideRatingUpdatedAt: null,
         registeredAt: "18-09-2026",
         dsuProfileUrl: "https://rating.skak.dk/1234",
         fideProfileUrl: "https://ratings.fide.com/profile/1500000",

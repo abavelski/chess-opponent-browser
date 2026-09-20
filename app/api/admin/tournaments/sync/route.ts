@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { playerAliases, players, tournamentParticipants, tournaments } from "@/lib/db/schema";
 import { normalizeImportedPlayerName } from "@/lib/imports/persist";
-import { calculateRemovalSafety, ratingChanged } from "@/lib/participants/reconciliation";
+import { calculateRemovalSafety, ratingChanged, reconciledProviderRating } from "@/lib/participants/reconciliation";
 import { parseParticipantSnapshot } from "@/lib/participants/snapshot";
 
 export const dynamic = "force-dynamic";
@@ -76,6 +76,8 @@ export async function POST(request: Request) {
     const planned: Array<{
       participant: (typeof snapshot.players)[number];
       player: (typeof canonicalPlayers)[number] | null;
+      nextDsuRating: number | null;
+      nextFideRating: number | null;
     }> = [];
     const createdNames: string[] = [];
     const addedNames: string[] = [];
@@ -95,6 +97,12 @@ export async function POST(request: Request) {
 
       const nameMatches = byName.get(normalizeImportedPlayerName(participant.name)) ?? [];
       const player = dsuMatch ?? fideMatch ?? (nameMatches.length === 1 ? nameMatches[0] : null);
+      const nextDsuRating = player
+        ? reconciledProviderRating(player.currentDsuRating, participant.actualDsuRating, participant.dsuRatingUpdatedAt)
+        : participant.actualDsuRating;
+      const nextFideRating = player
+        ? reconciledProviderRating(player.currentFideRating, participant.actualFideRating, participant.fideRatingUpdatedAt)
+        : participant.actualFideRating;
       if (player) {
         if (matchedPlayerIds.has(player.id)) {
           return errorResponse(`Multiple snapshot participants resolve to ${player.name}.`, 409);
@@ -105,20 +113,20 @@ export async function POST(request: Request) {
         if (ratingChanged(
           player.currentDsuRating,
           player.currentFideRating,
-          participant.actualDsuRating,
-          participant.actualFideRating,
+          nextDsuRating,
+          nextFideRating,
         )) {
           ratingChanges.push({
             name: participant.name,
-            dsu: [player.currentDsuRating, participant.actualDsuRating],
-            fide: [player.currentFideRating, participant.actualFideRating],
+            dsu: [player.currentDsuRating, nextDsuRating],
+            fide: [player.currentFideRating, nextFideRating],
           });
         }
       } else {
         createdNames.push(participant.name);
         addedNames.push(participant.name);
       }
-      planned.push({ participant, player });
+      planned.push({ participant, player, nextDsuRating, nextFideRating });
     }
 
     const removedRows = currentRoster.filter((row) => !matchedPlayerIds.has(row.playerId));
@@ -174,11 +182,10 @@ export async function POST(request: Request) {
           )));
     }
 
-    const ratingsUpdatedAt = snapshot.ratingsUpdatedAt ? new Date(snapshot.ratingsUpdatedAt) : null;
     const syncedAt = new Date();
-    for (const { participant, player } of planned) {
+    for (const { participant, player, nextDsuRating, nextFideRating } of planned) {
       const participantValues = {
-        rating: participant.actualDsuRating ?? participant.actualFideRating,
+        rating: nextDsuRating ?? nextFideRating,
         groupName: participant.group,
         club: participant.club,
         tournamentDsuRating: participant.tournamentDsuRating,
@@ -192,11 +199,16 @@ export async function POST(request: Request) {
           name: participant.name,
           dsuId: participant.dsuId ?? player.dsuId,
           fideId: participant.fideId ?? player.fideId,
-          currentDsuRating: participant.actualDsuRating,
-          currentFideRating: participant.actualFideRating,
-          dsuProfileUrl: participant.dsuProfileUrl,
-          fideProfileUrl: participant.fideProfileUrl,
-          ratingsUpdatedAt,
+          currentDsuRating: nextDsuRating,
+          currentFideRating: nextFideRating,
+          dsuProfileUrl: participant.dsuProfileUrl ?? player.dsuProfileUrl,
+          fideProfileUrl: participant.fideProfileUrl ?? player.fideProfileUrl,
+          dsuRatingUpdatedAt: participant.dsuRatingUpdatedAt
+            ? new Date(participant.dsuRatingUpdatedAt)
+            : player.dsuRatingUpdatedAt,
+          fideRatingUpdatedAt: participant.fideRatingUpdatedAt
+            ? new Date(participant.fideRatingUpdatedAt)
+            : player.fideRatingUpdatedAt,
         }).where(eq(players.id, player.id)));
         operations.push(db.insert(tournamentParticipants).values({
           tournamentId: targetTournament.id,
@@ -211,11 +223,13 @@ export async function POST(request: Request) {
           with inserted_player as (
             insert into players (
               name, dsu_id, fide_id, current_dsu_rating, current_fide_rating,
-              dsu_profile_url, fide_profile_url, ratings_updated_at
+              dsu_profile_url, fide_profile_url, dsu_rating_updated_at, fide_rating_updated_at
             ) values (
               ${participant.name}, ${participant.dsuId}, ${participant.fideId},
-              ${participant.actualDsuRating}, ${participant.actualFideRating},
-              ${participant.dsuProfileUrl}, ${participant.fideProfileUrl}, ${ratingsUpdatedAt}
+              ${nextDsuRating}, ${nextFideRating},
+              ${participant.dsuProfileUrl}, ${participant.fideProfileUrl},
+              ${participant.dsuRatingUpdatedAt ? new Date(participant.dsuRatingUpdatedAt) : null},
+              ${participant.fideRatingUpdatedAt ? new Date(participant.fideRatingUpdatedAt) : null}
             )
             returning id
           )

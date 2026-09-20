@@ -1,9 +1,9 @@
-import { desc } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import Link from "next/link";
 
 import { DeleteTournamentForm } from "@/app/tournaments/[id]/delete-tournament-form";
 import { getDb } from "@/lib/db";
-import { tournaments } from "@/lib/db/schema";
+import { syncRuns, tournaments } from "@/lib/db/schema";
 
 import { activateTournament, updateTournamentDetails } from "./actions";
 import type { TournamentDetailsErrorCode } from "@/lib/tournaments/validation";
@@ -38,21 +38,74 @@ function detailsErrorMessage(error: DetailsError | undefined) {
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const { activateError, deleteError, detailsError, tournamentId: detailsTournamentId } = await searchParams;
   const detailsMessage = detailsErrorMessage(detailsError);
-  let tournamentRows: Array<{ id: number; name: string; nickname: string; sourceUrl: string | null; participantGroup: string | null; isActive: boolean }> = [];
+  let tournamentRows: Array<{
+    id: number;
+    name: string;
+    nickname: string;
+    sourceUrl: string | null;
+    participantGroup: string | null;
+    isActive: boolean;
+    participantCount: number;
+    staleDsuCount: number;
+    staleFideCount: number;
+  }> = [];
+  let recentSyncRuns: Array<{
+    id: number;
+    tournamentName: string;
+    kind: string;
+    status: string;
+    startedAt: Date;
+    completedAt: Date | null;
+    errorText: string | null;
+  }> = [];
   let loadError = false;
 
   try {
-    tournamentRows = await getDb()
-      .select({
-        id: tournaments.id,
-        name: tournaments.name,
-        nickname: tournaments.nickname,
-        sourceUrl: tournaments.sourceUrl,
-        participantGroup: tournaments.participantGroup,
-        isActive: tournaments.isActive,
-      })
-      .from(tournaments)
-      .orderBy(desc(tournaments.createdAt), desc(tournaments.id));
+    const db = getDb();
+    [tournamentRows, recentSyncRuns] = await Promise.all([
+      db.select({
+          id: tournaments.id,
+          name: tournaments.name,
+          nickname: tournaments.nickname,
+          sourceUrl: tournaments.sourceUrl,
+          participantGroup: tournaments.participantGroup,
+          isActive: tournaments.isActive,
+          participantCount: sql<number>`(
+            select count(*)::int from tournament_participants tp where tp.tournament_id = ${tournaments.id}
+          )`,
+          staleDsuCount: sql<number>`(
+            select count(*)::int
+            from tournament_participants tp
+            inner join players p on p.id = tp.player_id
+            where tp.tournament_id = ${tournaments.id}
+              and p.dsu_profile_url is not null
+              and (p.dsu_rating_updated_at is null or p.dsu_rating_updated_at < now() - interval '30 days')
+          )`,
+          staleFideCount: sql<number>`(
+            select count(*)::int
+            from tournament_participants tp
+            inner join players p on p.id = tp.player_id
+            where tp.tournament_id = ${tournaments.id}
+              and (p.fide_id is not null or p.fide_profile_url is not null)
+              and (p.fide_rating_updated_at is null or p.fide_rating_updated_at < now() - interval '30 days')
+          )`,
+        })
+        .from(tournaments)
+        .orderBy(desc(tournaments.createdAt), desc(tournaments.id)),
+      db.select({
+          id: syncRuns.id,
+          tournamentName: tournaments.name,
+          kind: syncRuns.kind,
+          status: syncRuns.status,
+          startedAt: syncRuns.startedAt,
+          completedAt: syncRuns.completedAt,
+          errorText: syncRuns.errorText,
+        })
+        .from(syncRuns)
+        .innerJoin(tournaments, eq(syncRuns.tournamentId, tournaments.id))
+        .orderBy(desc(syncRuns.startedAt), desc(syncRuns.id))
+        .limit(10),
+    ]);
   } catch (error) {
     console.error("Failed to load admin tournaments", error);
     loadError = true;
@@ -84,6 +137,38 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         <Link href="/imports">Import history</Link>
         <Link href="/unresolved-players">Unresolved players</Link>
       </nav>
+
+      <section className="admin-sync-status" aria-labelledby="sync-status-heading">
+        <h2 id="sync-status-heading">Recent syncs</h2>
+        {recentSyncRuns.length === 0 ? (
+          <p className="simple-empty-copy">No sync runs recorded yet.</p>
+        ) : (
+          <div className="admin-sync-table-wrap">
+            <table className="admin-sync-table">
+              <thead>
+                <tr>
+                  <th>Tournament</th>
+                  <th>Kind</th>
+                  <th>Status</th>
+                  <th>Started</th>
+                  <th>Message</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentSyncRuns.map((run) => (
+                  <tr key={run.id} title={run.errorText ?? undefined}>
+                    <td>{run.tournamentName}</td>
+                    <td>{run.kind}</td>
+                    <td><span className={`sync-status sync-status-${run.status}`}>{run.status.replaceAll("_", " ")}</span></td>
+                    <td>{new Intl.DateTimeFormat("da-DK", { dateStyle: "short", timeStyle: "short" }).format(run.startedAt)}</td>
+                    <td className="sync-message-cell">{run.errorText ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <section className="admin-tournaments">
         {tournamentRows.map((tournament) => {
@@ -163,6 +248,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   <Link href={`/imports/new?tournamentId=${tournament.id}`}>Import games</Link>
                   <Link href={`/tournaments/${tournament.id}/opponents/new`}>Add opponent</Link>
                 </div>
+                <p className="admin-sync-summary">
+                  {tournament.participantCount} players · stale ratings: DSU {tournament.staleDsuCount}, FIDE {tournament.staleFideCount}
+                </p>
               </div>
 
               <DeleteTournamentForm

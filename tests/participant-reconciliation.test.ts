@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { calculateRemovalSafety, ratingChanged } from "@/lib/participants/reconciliation";
+import { calculateRemovalSafety, ratingChanged, reconciledProviderRating } from "@/lib/participants/reconciliation";
 
 describe("participant reconciliation safety", () => {
   it("requires force when more than a quarter of a roster would be removed", () => {
@@ -21,5 +21,11 @@ describe("participant reconciliation safety", () => {
   it("detects DSU and FIDE rating changes", () => {
     expect(ratingChanged(1800, 1750, 1800, 1750)).toBe(false);
     expect(ratingChanged(1800, 1750, 1810, 1750)).toBe(true);
+  });
+
+  it("preserves a known rating unless that provider was successfully refreshed", () => {
+    expect(reconciledProviderRating(1800, null, null)).toBe(1800);
+    expect(reconciledProviderRating(1800, null, "2026-09-20T10:00:00.000Z")).toBeNull();
+    expect(reconciledProviderRating(1800, 1812, "2026-09-20T10:00:00.000Z")).toBe(1812);
   });
 });

@@ -1,15 +1,23 @@
 #!/usr/bin/env node
 
+import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { packFilename, uploadPack } from "./add-opponents.mjs";
 import { extractOpponentPacks } from "./extract-opponent.mjs";
+import {
+  extractVisibleDsuParticipants,
+  fetchDsuProfile,
+  openDsuParticipantTable,
+} from "../lib/local/sources/dsu.mjs";
+import { fetchFideProfile } from "../lib/local/sources/fide.mjs";
 
 const DEFAULT_DANBASE = "C:/dev/danbase.pgn";
 const DEFAULT_APP_URL = "https://chess-opponent-browser.vercel.app";
 const DEFAULT_TOURNAMENT_URL = "https://turnering.skak.dk/TournamentActive/Details?tourId=30508";
+const DEFAULT_RATING_TTL_DAYS = 30;
 const COMMANDS = new Set(["all", "participants", "dsu", "fide", "ratings", "app", "games"]);
 
 export function toRating(value) {
@@ -64,6 +72,8 @@ export function mergeParticipants(existing, fresh) {
       ...player,
       actualDsuRating: previous.actualDsuRating ?? player.actualDsuRating,
       actualFideRating: previous.actualFideRating ?? player.actualFideRating,
+      dsuRatingUpdatedAt: previous.dsuRatingUpdatedAt ?? null,
+      fideRatingUpdatedAt: previous.fideRatingUpdatedAt ?? null,
       fideId: player.fideId ?? previous.fideId,
       dsuProfileUrl: player.dsuProfileUrl ?? previous.dsuProfileUrl,
       fideProfileUrl: player.fideProfileUrl ?? previous.fideProfileUrl,
@@ -82,6 +92,8 @@ export function parseArguments(argv) {
     packsDir: "",
     throttleMs: 2500,
     includeRatings: false,
+    ratingMode: "none",
+    ratingTtlDays: DEFAULT_RATING_TTL_DAYS,
     dryRun: false,
     force: false,
     help: false,
@@ -96,10 +108,17 @@ export function parseArguments(argv) {
   for (; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === "--help" || argument === "-h") options.help = true;
-    else if (argument === "--ratings") options.includeRatings = true;
+    else if (argument === "--ratings") {
+      options.includeRatings = true;
+      options.ratingMode = "all";
+    }
+    else if (argument === "--ratings=stale") {
+      options.includeRatings = true;
+      options.ratingMode = "stale";
+    }
     else if (argument === "--dry-run") options.dryRun = true;
     else if (argument === "--force") options.force = true;
-    else if (["--file", "-f", "--url", "-u", "--danbase", "--input", "-i", "--app-url", "--packs-dir", "--throttle"].includes(argument)) {
+    else if (["--file", "-f", "--url", "-u", "--danbase", "--input", "-i", "--app-url", "--packs-dir", "--throttle", "--rating-ttl-days"].includes(argument)) {
       const value = argv[++index];
       if (!value) throw new Error(`${argument} requires a value.`);
       if (argument === "--file" || argument === "-f") options.snapshotPath = value;
@@ -107,7 +126,8 @@ export function parseArguments(argv) {
       else if (["--danbase", "--input", "-i"].includes(argument)) options.danbasePath = value;
       else if (argument === "--app-url") options.appUrl = value;
       else if (argument === "--packs-dir") options.packsDir = value;
-      else options.throttleMs = Number(value);
+      else if (argument === "--throttle") options.throttleMs = Number(value);
+      else options.ratingTtlDays = Number(value);
     } else if (!argument.startsWith("-") && !options.nickname) {
       options.nickname = argument.trim().toLowerCase();
     } else throw new Error(`Unknown argument: ${argument}`);
@@ -115,6 +135,9 @@ export function parseArguments(argv) {
 
   if (!Number.isFinite(options.throttleMs) || options.throttleMs < 0) {
     throw new Error("--throttle must be a non-negative number.");
+  }
+  if (!Number.isFinite(options.ratingTtlDays) || options.ratingTtlDays < 1) {
+    throw new Error("--rating-ttl-days must be a positive number.");
   }
   return options;
 }
@@ -175,9 +198,64 @@ export function assertSnapshotTarget(snapshot, nickname) {
 
 export async function readSnapshot(filePath) {
   const parsed = JSON.parse(await readFile(resolve(filePath), "utf8"));
-  if (Array.isArray(parsed)) return { version: 1, sourceUrl: null, extractedAt: null, ratingsUpdatedAt: null, players: parsed };
+  if (Array.isArray(parsed)) return { version: 2, sourceUrl: null, extractedAt: null, players: parsed };
   if (!parsed || !Array.isArray(parsed.players)) throw new Error("Snapshot must contain a players array.");
-  return parsed;
+  return {
+    ...parsed,
+    version: 2,
+    players: parsed.players.map((player) => ({
+      ...player,
+      dsuRatingUpdatedAt: player.dsuRatingUpdatedAt ?? null,
+      fideRatingUpdatedAt: player.fideRatingUpdatedAt ?? null,
+    })),
+  };
+}
+
+export function isProviderRatingStale(updatedAt, ttlDays, now = new Date()) {
+  if (!updatedAt) return true;
+  const timestamp = new Date(updatedAt).valueOf();
+  if (!Number.isFinite(timestamp)) return true;
+  return now.valueOf() - timestamp >= ttlDays * 24 * 60 * 60 * 1000;
+}
+
+export function snapshotHash(snapshot) {
+  return createHash("sha256").update(JSON.stringify(snapshot)).digest("hex");
+}
+
+function syncRunKind(command) {
+  if (["dsu", "fide", "ratings"].includes(command)) return "ratings";
+  if (command === "games") return "games";
+  if (["participants", "app"].includes(command)) return "participants";
+  return "full";
+}
+
+async function startSyncRun(options) {
+  const response = await fetch(new URL("/api/admin/tournaments/sync-runs", options.appUrl), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ tournamentNickname: options.nickname, kind: syncRunKind(options.command) }),
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || !payload?.ok) throw new Error(payload?.message || `Could not start sync run (HTTP ${response.status}).`);
+  return payload.run;
+}
+
+async function finishSyncRun(options, run, status, summary, errorText = null) {
+  const snapshot = await readSnapshot(options.snapshotPath).catch(() => null);
+  const response = await fetch(new URL("/api/admin/tournaments/sync-runs", options.appUrl), {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      id: run.id,
+      tournamentNickname: options.nickname,
+      status,
+      snapshotHash: snapshot ? snapshotHash(snapshot) : null,
+      summary,
+      errorText,
+    }),
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || !payload?.ok) throw new Error(payload?.message || `Could not finish sync run (HTTP ${response.status}).`);
 }
 
 async function saveSnapshot(filePath, snapshot) {
@@ -207,53 +285,6 @@ async function launchBrowser() {
   return puppeteer.launch({ headless: true, args: ["--no-sandbox"] });
 }
 
-async function openParticipantTable(page, url) {
-  await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
-  await page.waitForSelector("ul.tabs a", { timeout: 15000 });
-  const count = await page.$$eval("ul.tabs a", (tabs) => tabs.length);
-  if (!count) throw new Error("No tournament tabs found.");
-  await page.click(`ul.tabs li:nth-child(${count}) a`);
-  await page.waitForSelector("#tour-players table", { timeout: 15000 });
-}
-
-async function extractVisibleParticipants(page) {
-  return page.evaluate(() => {
-    const clean = (value) => (value || "").replace(/\s+/g, " ").trim();
-    const normalize = (value) => clean(value).toLowerCase();
-    const tables = Array.from(document.querySelectorAll("#tour-players table")).filter((table) => {
-      const headers = Array.from(table.querySelectorAll("thead th")).map((th) => normalize(th.textContent));
-      return headers.includes("navn") && headers.includes("rating (std.)");
-    });
-
-    return tables.flatMap((table) => {
-      const headers = Array.from(table.querySelectorAll("thead th")).map((th) => normalize(th.textContent));
-      const at = (name) => headers.indexOf(name);
-      const group = clean(table.querySelector("caption")?.textContent).replace(/^Deltagere i gruppen\s*/i, "").trim();
-      return Array.from(table.querySelectorAll("tbody tr")).map((row) => {
-        const cells = Array.from(row.querySelectorAll("td"));
-        const name = clean(cells[at("navn")]?.textContent);
-        if (!name) return null;
-        const dsuCell = cells[at("dsu")];
-        const fideCell = cells[at("fide")];
-        const dsuLink = dsuCell?.querySelector("a[href]");
-        const fideLink = fideCell?.querySelector("a[href]");
-        return {
-          name,
-          group: group || null,
-          dsuId: clean(dsuCell?.textContent) || null,
-          fideId: clean(fideCell?.textContent).replace(/^-$/, "") || null,
-          club: at("klubber") >= 0 ? clean(cells[at("klubber")]?.textContent) || null : null,
-          tournamentDsuRating: at("rating (std.)") >= 0 ? clean(cells[at("rating (std.)")]?.textContent) : null,
-          tournamentFideRating: at("fide rating") >= 0 ? clean(cells[at("fide rating")]?.textContent) : null,
-          registeredAt: at("tilmeldt") >= 0 ? clean(cells[at("tilmeldt")]?.textContent) || null : null,
-          dsuProfileUrl: dsuLink ? new URL(dsuLink.getAttribute("href"), document.baseURI).href : null,
-          fideProfileUrl: fideLink ? new URL(fideLink.getAttribute("href"), document.baseURI).href : null,
-        };
-      }).filter(Boolean);
-    });
-  });
-}
-
 async function extractAllParticipants(page) {
   const tableId = await page.evaluate(() => {
     const clean = (value) => (value || "").replace(/\s+/g, " ").trim().toLowerCase();
@@ -266,7 +297,7 @@ async function extractAllParticipants(page) {
 
   const players = new Map();
   while (true) {
-    for (const raw of await extractVisibleParticipants(page)) {
+    for (const raw of await extractVisibleDsuParticipants(page)) {
       const player = {
         ...raw,
         name: normalizeParticipantName(raw.name),
@@ -274,6 +305,8 @@ async function extractAllParticipants(page) {
         tournamentFideRating: toRating(raw.tournamentFideRating),
         actualDsuRating: null,
         actualFideRating: null,
+        dsuRatingUpdatedAt: null,
+        fideRatingUpdatedAt: null,
       };
       players.set(identityKeys(player)[0] ?? `name:${player.name.toLowerCase()}`, player);
     }
@@ -300,7 +333,7 @@ export async function refreshParticipants(options) {
   const browser = await launchBrowser();
   try {
     const page = await browser.newPage();
-    await openParticipantTable(page, sourceUrl);
+    await openDsuParticipantTable(page, sourceUrl);
     const extracted = await extractAllParticipants(page);
     const selected = filterParticipantsByGroup(extracted, tournament.participantGroup);
     if (tournament.participantGroup && selected.length === 0) {
@@ -309,12 +342,11 @@ export async function refreshParticipants(options) {
     }
     const players = mergeParticipants(previous.players, selected);
     const snapshot = {
-      version: 1,
+      version: 2,
       tournamentNickname: tournament.nickname,
       participantGroup: tournament.participantGroup,
       sourceUrl,
       extractedAt: new Date().toISOString(),
-      ratingsUpdatedAt: previous.ratingsUpdatedAt ?? null,
       players,
     };
     const target = await saveSnapshot(options.snapshotPath, snapshot);
@@ -330,58 +362,65 @@ export async function refreshParticipants(options) {
   }
 }
 
-async function fetchDsuProfile(page, player) {
-  if (!player.dsuProfileUrl) return;
-  await page.goto(player.dsuProfileUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
-  await page.waitForSelector("#medlem-detaljer table", { timeout: 10000 });
-  const values = await page.evaluate(() => {
-    const clean = (value) => (value || "").replace(/\s+/g, " ").trim();
-    const valueAfter = (label) => {
-      const header = Array.from(document.querySelectorAll("#medlem-detaljer th")).find((th) => clean(th.textContent).toLowerCase() === label.toLowerCase());
-      if (!header) return "";
-      const cells = Array.from(header.parentElement.children);
-      return clean(cells[cells.indexOf(header) + 1]?.textContent);
-    };
-    return { dsu: valueAfter("Dansk rating"), fide: valueAfter("Fide rating"), fideId: valueAfter("Fide nummer") };
-  });
-  player.actualDsuRating = toRating(values.dsu);
-  player.actualFideRating = toRating(values.fide) ?? player.actualFideRating;
-  player.fideId = player.fideId ?? (values.fideId || null);
-  player.fideProfileUrl = player.fideProfileUrl ?? (player.fideId ? `https://ratings.fide.com/profile/${player.fideId}` : null);
-}
-
-async function fetchFideProfile(page, player) {
-  const url = player.fideProfileUrl ?? (player.fideId ? `https://ratings.fide.com/profile/${player.fideId}` : null);
-  if (!url) return;
-  player.fideProfileUrl = url;
-  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
-  const rating = await page.evaluate(() => {
-    const text = (document.querySelector("section.directory")?.textContent || document.body.textContent || "").replace(/\s+/g, " ");
-    return text.match(/(\d{3,4}|Not rated)\s*STANDARD/i)?.[1] || "";
-  });
-  player.actualFideRating = toRating(rating);
-}
-
 export async function refreshRatings(options, types) {
   const snapshot = await readSnapshot(options.snapshotPath);
+  const mode = options.ratingMode === "stale" ? "stale" : "all";
+  const summary = {
+    mode,
+    ttlDays: options.ratingTtlDays,
+    updated: 0,
+    skippedFresh: 0,
+    skippedMissingIdentity: 0,
+    failed: 0,
+    failures: [],
+  };
   const browser = await launchBrowser();
   try {
     const page = await browser.newPage();
     for (const type of types) {
+      let requested = 0;
       for (const [index, player] of snapshot.players.entries()) {
-        if (index > 0 && options.throttleMs) await new Promise((resolveDelay) => setTimeout(resolveDelay, options.throttleMs));
+        const timestampField = type === "dsu" ? "dsuRatingUpdatedAt" : "fideRatingUpdatedAt";
+        if (mode === "stale" && !isProviderRatingStale(player[timestampField], options.ratingTtlDays)) {
+          summary.skippedFresh += 1;
+          continue;
+        }
+        if (requested > 0 && options.throttleMs) await new Promise((resolveDelay) => setTimeout(resolveDelay, options.throttleMs));
         process.stdout.write(`${type.toUpperCase()} ${index + 1}/${snapshot.players.length}: ${player.name}\n`);
         try {
-          if (type === "dsu") await fetchDsuProfile(page, player);
-          else await fetchFideProfile(page, player);
+          const result = type === "dsu"
+            ? await fetchDsuProfile(page, player)
+            : await fetchFideProfile(page, player);
+          requested += 1;
+          if (result.status === "skipped") {
+            summary.skippedMissingIdentity += 1;
+            process.stdout.write(`  skipped: ${result.reason}\n`);
+            continue;
+          }
+          const updatedAt = new Date().toISOString();
+          if (type === "dsu") {
+            player.actualDsuRating = result.dsuRating;
+            player.dsuRatingUpdatedAt = updatedAt;
+            player.fideId = player.fideId ?? result.fideId;
+            player.fideProfileUrl = player.fideProfileUrl ?? (player.fideId ? `https://ratings.fide.com/profile/${player.fideId}` : null);
+          } else {
+            player.actualFideRating = result.fideRating;
+            player.fideRatingUpdatedAt = updatedAt;
+            player.fideProfileUrl = result.profileUrl;
+          }
+          summary.updated += 1;
         } catch (error) {
-          process.stderr.write(`  skipped: ${error instanceof Error ? error.message : String(error)}\n`);
+          requested += 1;
+          summary.failed += 1;
+          const message = error instanceof Error ? error.message : String(error);
+          summary.failures.push({ provider: type, player: player.name, message });
+          process.stderr.write(`  skipped: ${message}\n`);
         }
       }
     }
-    snapshot.ratingsUpdatedAt = new Date().toISOString();
     await saveSnapshot(options.snapshotPath, snapshot);
-    return snapshot;
+    await updateSyncState(options, "ratings", { completedAt: new Date().toISOString(), ...summary });
+    return summary;
   } finally {
     await browser.close();
   }
@@ -439,12 +478,19 @@ export async function syncGames(options) {
 
   let failures = 0;
   let packCount = 0;
+  let noGamesCount = 0;
+  let importedCount = 0;
+  let duplicateCount = 0;
+  let parseErrorCount = 0;
+  let persistenceErrorCount = 0;
+  let identityConflictCount = 0;
   for (const [index, player] of snapshot.players.entries()) {
     const name = normalizeParticipantName(player.name);
     process.stdout.write(`Games ${index + 1}/${snapshot.players.length}: ${name}\n`);
     const pack = extraction.opponents[index];
     try {
       if (!pack || pack.matched === 0) {
+        noGamesCount += 1;
         process.stderr.write("  no Danbase games found.\n");
       } else if (options.dryRun) {
         packCount += 1;
@@ -458,6 +504,11 @@ export async function syncGames(options) {
           packPath: pack.outputPath,
           tournamentNickname: options.nickname,
         });
+        importedCount += uploaded.import.importedCount;
+        duplicateCount += uploaded.import.duplicateCount;
+        parseErrorCount += uploaded.import.parseErrorCount;
+        persistenceErrorCount += uploaded.import.persistenceErrorCount;
+        identityConflictCount += uploaded.opponent?.conflictCount ?? 0;
         process.stdout.write(`  ${uploaded.import.importedCount} new, ${uploaded.import.duplicateCount} duplicate.\n`);
       }
     } catch (error) {
@@ -470,28 +521,84 @@ export async function syncGames(options) {
     completedAt: new Date().toISOString(),
     scannedGames: extraction.scanned,
     packCount,
+    noGamesCount,
+    importedCount,
+    duplicateCount,
+    parseErrorCount,
+    persistenceErrorCount,
+    identityConflictCount,
   });
+  return {
+    scannedGames: extraction.scanned,
+    packCount,
+    noGamesCount,
+    importedCount,
+    duplicateCount,
+    parseErrorCount,
+    persistenceErrorCount,
+    identityConflictCount,
+  };
 }
 
 function usage() {
-  return `Synchronize a Danish tournament and its Danbase games.\n\nUsage:\n  npm run sync-tournament -- <nickname>\n  npm run sync-tournament -- <nickname> --ratings\n  npm run sync-tournament -- <nickname> --dry-run\n  npm run sync-participants -- <nickname>\n  npm run sync-ratings -- <nickname>\n  npm run sync-app -- <nickname>\n  npm run sync-games -- <nickname>\n\nThe nickname loads that exact tournament even when it is inactive. Omit it to\nuse the active tournament. Rating updates are skipped by the normal full sync\nunless --ratings is specified.\n\nCommands: all, participants, dsu, fide, ratings, app, games\nOptions:\n  -f, --file <path>       Override the per-tournament local snapshot\n  -u, --url <url>         Override the saved tournament URL for this run\n      --ratings           Refresh DSU and FIDE ratings during a full sync\n      --danbase <path>    Danbase PGN (default: ${DEFAULT_DANBASE})\n      --app-url <url>     Target app (default: OPPONENT_BROWSER_URL or Production)\n      --packs-dir <path>  Override the per-tournament PGN packs folder\n      --dry-run           Plan app changes and extract packs without uploading\n      --force             Allow a large participant-roster removal\n      --throttle <ms>     Delay between rating pages (default: 2500)\n`;
+  return `Synchronize a Danish tournament and its Danbase games.\n\nUsage:\n  npm run sync-tournament -- <nickname>\n  npm run sync-tournament -- <nickname> --ratings\n  npm run sync-tournament -- <nickname> --ratings=stale\n  npm run sync-tournament -- <nickname> --dry-run\n  npm run sync-participants -- <nickname>\n  npm run sync-ratings -- <nickname>\n  npm run sync-app -- <nickname>\n  npm run sync-games -- <nickname>\n\nThe nickname loads that exact tournament even when it is inactive. Omit it to\nuse the active tournament. Rating updates are skipped by the normal full sync\nunless --ratings or --ratings=stale is specified.\n\nCommands: all, participants, dsu, fide, ratings, app, games\nOptions:\n  -f, --file <path>       Override the per-tournament local snapshot\n  -u, --url <url>         Override the saved tournament URL for this run\n      --ratings           Refresh every DSU and FIDE rating\n      --ratings=stale     Refresh only provider ratings older than the TTL\n      --rating-ttl-days   Stale rating age (default: ${DEFAULT_RATING_TTL_DAYS})\n      --danbase <path>    Danbase PGN (default: ${DEFAULT_DANBASE})\n      --app-url <url>     Target app (default: OPPONENT_BROWSER_URL or Production)\n      --packs-dir <path>  Override the per-tournament PGN packs folder\n      --dry-run           Plan app changes and extract packs without uploading\n      --force             Allow a large participant-roster removal\n      --throttle <ms>     Delay between rating pages (default: 2500)\n`;
 }
 
 export async function main(argv = process.argv.slice(2)) {
   const parsedOptions = parseArguments(argv);
   if (parsedOptions.help) return process.stdout.write(usage());
   const options = await configureWorkspace(parsedOptions);
-  if (options.command === "participants") return refreshParticipants(options);
-  if (options.command === "dsu") return refreshRatings(options, ["dsu"]);
-  if (options.command === "fide") return refreshRatings(options, ["fide"]);
-  if (options.command === "ratings") return refreshRatings(options, ["dsu", "fide"]);
-  if (options.command === "app") return syncApp(options);
-  if (options.command === "games") return syncGames(options);
+  const run = options.dryRun ? null : await startSyncRun(options);
+  const summary = { stages: {} };
+  try {
+    if (options.command === "participants") {
+      const snapshot = await refreshParticipants(options);
+      summary.stages.participants = { count: snapshot.players.length };
+    } else if (options.command === "dsu") {
+      summary.stages.ratings = await refreshRatings(options, ["dsu"]);
+    } else if (options.command === "fide") {
+      summary.stages.ratings = await refreshRatings(options, ["fide"]);
+    } else if (options.command === "ratings") {
+      summary.stages.ratings = await refreshRatings(options, ["dsu", "fide"]);
+    } else if (options.command === "app") {
+      summary.stages.participants = (await syncApp(options)).participants;
+    } else if (options.command === "games") {
+      summary.stages.games = await syncGames(options);
+    } else {
+      const snapshot = await refreshParticipants(options);
+      summary.stages.participantsFetch = { count: snapshot.players.length };
+      if (options.includeRatings) summary.stages.ratings = await refreshRatings(options, ["dsu", "fide"]);
+      summary.stages.participants = (await syncApp(options)).participants;
+      summary.stages.games = await syncGames(options);
+    }
 
-  await refreshParticipants(options);
-  if (options.includeRatings) await refreshRatings(options, ["dsu", "fide"]);
-  await syncApp(options);
-  await syncGames(options);
+    const ratingFailures = summary.stages.ratings?.failed ?? 0;
+    const gameErrors = (summary.stages.games?.parseErrorCount ?? 0)
+      + (summary.stages.games?.persistenceErrorCount ?? 0)
+      + (summary.stages.games?.identityConflictCount ?? 0);
+    const issueCount = ratingFailures + gameErrors;
+    if (run) {
+      await finishSyncRun(
+        options,
+        run,
+        issueCount ? "completed_with_errors" : "completed",
+        summary,
+        issueCount ? `${issueCount} rating/import issue(s) require review.` : null,
+      );
+    }
+    return summary;
+  } catch (error) {
+    if (run) {
+      await finishSyncRun(
+        options,
+        run,
+        "failed",
+        summary,
+        error instanceof Error ? error.message : String(error),
+      ).catch((finishError) => process.stderr.write(`Could not record failed sync: ${finishError instanceof Error ? finishError.message : String(finishError)}\n`));
+    }
+    throw error;
+  }
 }
 
 const invokedDirectly = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;

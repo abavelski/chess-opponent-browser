@@ -26,3 +26,11 @@ export function ratingChanged(
 ) {
   return currentDsuRating !== nextDsuRating || currentFideRating !== nextFideRating;
 }
+
+export function reconciledProviderRating(
+  currentRating: number | null,
+  snapshotRating: number | null,
+  providerUpdatedAt: string | null,
+) {
+  return providerUpdatedAt ? snapshotRating : currentRating;
+}

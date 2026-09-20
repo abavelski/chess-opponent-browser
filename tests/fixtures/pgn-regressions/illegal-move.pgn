@@ -1,0 +1,6 @@
+[Event "Illegal move"]
+[White "Alpha"]
+[Black "Beta"]
+[Result "*"]
+
+1. e4 e5 2. Qh9 *

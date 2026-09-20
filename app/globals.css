@@ -513,6 +513,72 @@ input:focus-visible {
   gap: 0.75rem;
 }
 
+.admin-sync-status {
+  margin-bottom: 1.5rem;
+}
+
+.admin-sync-status h2 {
+  margin-bottom: 0.65rem;
+  font-size: 1rem;
+}
+
+.admin-sync-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  background: var(--surface);
+}
+
+.admin-sync-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.admin-sync-table th,
+.admin-sync-table td {
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.admin-sync-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.admin-sync-table th {
+  color: var(--muted);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.sync-status {
+  font-weight: 700;
+}
+
+.sync-status-completed {
+  color: var(--accent);
+}
+
+.sync-status-failed,
+.sync-status-completed_with_errors {
+  color: var(--danger);
+}
+
+.sync-message-cell {
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-sync-summary {
+  margin: 0.45rem 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
 .admin-tournament-row {
   display: block;
   padding: 0.9rem 1rem;

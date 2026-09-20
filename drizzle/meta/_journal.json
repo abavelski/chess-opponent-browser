@@ -64,6 +64,13 @@
       "when": 1789760894420,
       "tag": "0008_loose_stranger",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789896404536,
+      "tag": "0009_stiff_killraven",
+      "breakpoints": true
     }
   ]
 }

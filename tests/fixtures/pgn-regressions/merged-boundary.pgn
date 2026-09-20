@@ -1,0 +1,12 @@
+[Event "First"]
+[White "Alpha"]
+[Black "Beta"]
+[Result "1-0"]
+
+1. e4 e5 1-0
+[Event "Second"]
+[White "Gamma"]
+[Black "Delta"]
+[Result "1/2-1/2"]
+
+1. d4 d5 1/2-1/2

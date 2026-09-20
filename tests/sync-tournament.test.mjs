@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { assertSnapshotTarget, danbaseNameVariants, filterParticipantsByGroup, identityKeys, mergeParticipants, normalizeParticipantName, parseArguments, toRating, workspacePaths } from "../scripts/sync-tournament.mjs";
+import { assertSnapshotTarget, danbaseNameVariants, filterParticipantsByGroup, identityKeys, isProviderRatingStale, mergeParticipants, normalizeParticipantName, parseArguments, snapshotHash, toRating, workspacePaths } from "../scripts/sync-tournament.mjs";
 
 describe("tournament sync CLI", () => {
   it("defers local paths until the tournament workspace is known", () => {
@@ -37,7 +37,21 @@ describe("tournament sync CLI", () => {
   it("only includes rating refreshes in full sync when explicitly requested", () => {
     expect(parseArguments(["all", "furesoe-open"])).toMatchObject({ includeRatings: false });
     expect(parseArguments(["all", "furesoe-open", "--ratings"]))
-      .toMatchObject({ includeRatings: true });
+      .toMatchObject({ includeRatings: true, ratingMode: "all" });
+    expect(parseArguments(["all", "furesoe-open", "--ratings=stale", "--rating-ttl-days", "14"]))
+      .toMatchObject({ includeRatings: true, ratingMode: "stale", ratingTtlDays: 14 });
+  });
+
+  it("selects stale provider ratings independently", () => {
+    const now = new Date("2026-09-20T00:00:00Z");
+    expect(isProviderRatingStale(null, 30, now)).toBe(true);
+    expect(isProviderRatingStale("2026-09-01T00:00:00Z", 30, now)).toBe(false);
+    expect(isProviderRatingStale("2026-08-01T00:00:00Z", 30, now)).toBe(true);
+  });
+
+  it("creates stable SHA-256 snapshot hashes", () => {
+    expect(snapshotHash({ players: [{ name: "A" }] })).toMatch(/^[a-f0-9]{64}$/);
+    expect(snapshotHash({ players: [{ name: "A" }] })).toBe(snapshotHash({ players: [{ name: "A" }] }));
   });
 
   it("parses dry-run and force safety controls", () => {

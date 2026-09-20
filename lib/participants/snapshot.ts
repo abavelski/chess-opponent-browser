@@ -8,6 +8,8 @@ export type ParticipantSnapshotPlayer = {
   tournamentFideRating: number | null;
   actualDsuRating: number | null;
   actualFideRating: number | null;
+  dsuRatingUpdatedAt: string | null;
+  fideRatingUpdatedAt: string | null;
   registeredAt: string | null;
   dsuProfileUrl: string | null;
   fideProfileUrl: string | null;
@@ -18,7 +20,6 @@ export type ParticipantSnapshot = {
   participantGroup: string | null;
   sourceUrl: string | null;
   extractedAt: string | null;
-  ratingsUpdatedAt: string | null;
   players: ParticipantSnapshotPlayer[];
 };
 
@@ -84,6 +85,8 @@ export function parseParticipantSnapshot(value: unknown): ParticipantSnapshot {
       tournamentFideRating: rating(player.tournamentFideRating),
       actualDsuRating: rating(player.actualDsuRating),
       actualFideRating: rating(player.actualFideRating),
+      dsuRatingUpdatedAt: timestamp(player.dsuRatingUpdatedAt),
+      fideRatingUpdatedAt: timestamp(player.fideRatingUpdatedAt),
       registeredAt: optionalText(player.registeredAt, 120),
       dsuProfileUrl: profileUrl(player.dsuProfileUrl),
       fideProfileUrl: profileUrl(player.fideProfileUrl),
@@ -109,7 +112,6 @@ export function parseParticipantSnapshot(value: unknown): ParticipantSnapshot {
     participantGroup: optionalText(input.participantGroup, 120),
     sourceUrl: profileUrl(input.sourceUrl),
     extractedAt: timestamp(input.extractedAt),
-    ratingsUpdatedAt: timestamp(input.ratingsUpdatedAt),
     players,
   };
 }

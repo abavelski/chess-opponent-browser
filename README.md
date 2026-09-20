@@ -91,6 +91,14 @@ To explicitly refresh DSU and FIDE ratings as part of the complete workflow:
 npm run sync-tournament -- furesoe-open-2026 --ratings
 ```
 
+To refresh only ratings whose provider-specific timestamp is older than 30 days:
+
+```bash
+npm run sync-tournament -- furesoe-open-2026 --ratings=stale
+```
+
+Override the freshness window with `--rating-ttl-days <days>`. Successful DSU and FIDE fetches are timestamped independently. A failed provider request preserves the last known rating and remains stale for retry.
+
 Preview participant changes and game packs without changing the hosted database. The refreshed snapshot, extracted packs, and `sync-state.json` remain in the local tournament workspace:
 
 ```bash
@@ -111,6 +119,8 @@ npm run sync-games -- furesoe-open-2026   # upload packs to this exact tournamen
 ```
 
 The nickname fetches that exact tournament's URL and optional participant group from the app, whether or not it is active. Omit the nickname to use the active tournament. A group-filtered sync reconciles only the selected roster while preserving global players and games. Defaults are `C:\dev\danbase.pgn`, per-tournament snapshot/pack paths, and the Production app URL. Override them with `--url`, `--danbase`, `--file`, `--packs-dir`, and `--app-url`. The browser's active tournament is never changed by CLI synchronization.
+
+Each non-dry-run CLI operation creates one high-level sync record. Recent runs and failures are visible on `/admin`; low-level PGN imports remain in Import history. Provider parsers and representative malformed PGNs are covered by saved fixtures under `tests/fixtures/`.
 
 If Danbase uses an older spelling for a player, add a local `danbaseAliases` array to that player in the snapshot. Participant refreshes preserve this local field.
 
