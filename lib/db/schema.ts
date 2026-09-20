@@ -31,6 +31,7 @@ export const tournaments = pgTable(
     isActive: boolean("is_active").default(false).notNull(),
     sourceUrl: text("source_url"),
     participantGroup: varchar("participant_group", { length: 120 }),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
@@ -42,6 +43,10 @@ export const tournaments = pgTable(
     check(
       "tournaments_participant_group_not_blank",
       sql`${table.participantGroup} is null or char_length(btrim(${table.participantGroup})) > 0`,
+    ),
+    check(
+      "tournaments_active_not_archived",
+      sql`not (${table.isActive} and ${table.archivedAt} is not null)`,
     ),
   ],
 );
@@ -93,6 +98,35 @@ export const players = pgTable(
     check(
       "players_fide_id_not_blank",
       sql`${table.fideId} is null or char_length(btrim(${table.fideId})) > 0`,
+    ),
+  ],
+);
+
+export const playerMergeHistory = pgTable(
+  "player_merge_history",
+  {
+    id: serial("id").primaryKey(),
+    sourcePlayerId: integer("source_player_id").notNull(),
+    targetPlayerId: integer("target_player_id").references(() => players.id, {
+      onDelete: "set null",
+    }),
+    sourceName: varchar("source_name", { length: 200 }).notNull(),
+    targetName: varchar("target_name", { length: 200 }).notNull(),
+    summaryJson: jsonb("summary_json").$type<Record<string, unknown>>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("player_merge_history_target_created_at_idx").on(
+      table.targetPlayerId,
+      table.createdAt,
+    ),
+    check(
+      "player_merge_history_source_name_not_blank",
+      sql`char_length(btrim(${table.sourceName})) > 0`,
+    ),
+    check(
+      "player_merge_history_target_name_not_blank",
+      sql`char_length(btrim(${table.targetName})) > 0`,
     ),
   ],
 );

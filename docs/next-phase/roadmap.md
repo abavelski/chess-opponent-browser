@@ -156,6 +156,8 @@ Keep representative failing PGNs as regression fixtures. Do not silently broaden
 
 ## P2 — Add Admin data health and cleanup
 
+**Status: implemented on 2026-09-20.** Archive/restore lifecycle, Admin health views, player health filters and merge history, conservative player merge, game/source inspection and deletion, sync-status view, and duplicate-only import-history pruning are now available. Source-occurrence removal remains intentionally deferred to P3 because the current game model does not yet represent independent source occurrences.
+
 ### Goal
 
 The application should be maintainable after many tournament cycles without manually editing the database.

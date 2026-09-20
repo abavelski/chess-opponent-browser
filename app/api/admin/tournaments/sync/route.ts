@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   try {
     const db = getDb();
     const [targetTournament] = await db
-      .select({ id: tournaments.id, name: tournaments.name, nickname: tournaments.nickname })
+      .select({ id: tournaments.id, name: tournaments.name, nickname: tournaments.nickname, archivedAt: tournaments.archivedAt })
       .from(tournaments)
       .where(snapshot.tournamentNickname
         ? eq(tournaments.nickname, snapshot.tournamentNickname)
@@ -45,6 +45,10 @@ export async function POST(request: Request) {
           : "No active tournament exists.",
         404,
       );
+    }
+
+    if (targetTournament.archivedAt) {
+      return errorResponse(`Tournament \'${targetTournament.nickname}\' is archived. Restore it before syncing.`, 409);
     }
 
     const [canonicalPlayers, aliases, currentRoster] = await Promise.all([

@@ -73,7 +73,7 @@ export async function activateTournament(formData: FormData) {
   try {
     const result = await getDb().execute(sql`
       with target as (
-        select "id" from "tournaments" where "id" = ${tournamentId}
+        select "id" from "tournaments" where "id" = ${tournamentId} and "archived_at" is null
       ), deactivated as (
         update "tournaments" set "is_active" = false
         where "is_active" = true
@@ -96,4 +96,54 @@ export async function activateTournament(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/admin");
   redirect("/admin");
+}
+
+
+export async function archiveTournament(formData: FormData) {
+  const tournamentId = parseTournamentId(formData.get("tournamentId"));
+
+  if (tournamentId === null) {
+    redirect("/admin?archiveError=database");
+  }
+
+  try {
+    const [updated] = await getDb()
+      .update(tournaments)
+      .set({ isActive: false, archivedAt: new Date() })
+      .where(eq(tournaments.id, tournamentId))
+      .returning({ id: tournaments.id });
+
+    if (!updated) throw new Error("Tournament not found");
+  } catch (error) {
+    console.error("Failed to archive tournament", error);
+    redirect("/admin?archiveError=database");
+  }
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  redirect("/admin");
+}
+
+export async function unarchiveTournament(formData: FormData) {
+  const tournamentId = parseTournamentId(formData.get("tournamentId"));
+
+  if (tournamentId === null) {
+    redirect("/admin?archiveError=database");
+  }
+
+  try {
+    const [updated] = await getDb()
+      .update(tournaments)
+      .set({ archivedAt: null })
+      .where(eq(tournaments.id, tournamentId))
+      .returning({ id: tournaments.id });
+
+    if (!updated) throw new Error("Tournament not found");
+  } catch (error) {
+    console.error("Failed to unarchive tournament", error);
+    redirect("/admin?archiveError=database");
+  }
+
+  revalidatePath("/admin");
+  redirect("/admin?showArchived=1");
 }

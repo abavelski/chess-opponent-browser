@@ -469,7 +469,7 @@ input:focus-visible {
 
 /* Separate administration surface */
 .admin-shell {
-  width: min(100% - 2rem, 52rem);
+  width: min(100% - 2rem, 72rem);
   padding: 2.5rem 0;
 }
 
@@ -636,7 +636,7 @@ input:focus-visible {
 @media (max-width: 640px) {
   .simple-tournament-shell,
   .admin-shell {
-    width: min(100% - 1.25rem, 52rem);
+    width: min(100% - 1.25rem, 72rem);
   }
 
   .admin-header {
@@ -734,4 +734,442 @@ input:focus-visible {
   .admin-save-name {
     width: 100%;
   }
+}
+
+
+/* Admin maintenance */
+.admin-wide-shell {
+  width: min(100% - 2rem, 78rem);
+  padding: 2.5rem 0;
+}
+
+.admin-subpage-topbar,
+.admin-section-header,
+.admin-section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.admin-subpage-topbar {
+  margin-bottom: 1.2rem;
+}
+
+.admin-subpage-topbar .back-link {
+  margin-bottom: 0;
+}
+
+.admin-section-header {
+  margin-bottom: 1.25rem;
+}
+
+.admin-section-header h1 {
+  margin-bottom: 0.35rem;
+  font-size: 1.55rem;
+}
+
+.admin-section-header p {
+  margin-bottom: 0;
+}
+
+.admin-section-title {
+  margin-bottom: 0.65rem;
+}
+
+.admin-section-title h2 {
+  font-size: 1rem;
+}
+
+.admin-overview-grid,
+.admin-health-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 1.5rem;
+}
+
+.admin-overview-grid a,
+.admin-health-grid a {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  background: var(--surface);
+  text-decoration: none;
+}
+
+.admin-overview-grid a:hover,
+.admin-health-grid a:hover {
+  border-color: var(--focus);
+}
+
+.admin-overview-grid strong,
+.admin-health-grid strong {
+  font-size: 1.25rem;
+}
+
+.admin-overview-grid span,
+.admin-health-grid span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.3;
+}
+
+.admin-health-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.admin-search-form {
+  display: flex;
+  gap: 0.55rem;
+  margin-bottom: 0.8rem;
+}
+
+.admin-search-form input,
+.admin-search-form select {
+  min-width: 0;
+  min-height: 2.4rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.admin-search-form input {
+  flex: 1;
+}
+
+.admin-search-form .button {
+  min-height: 2.4rem;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.82rem;
+}
+
+.admin-filter-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 1rem;
+}
+
+.admin-filter-links a {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.admin-filter-links a:hover,
+.admin-filter-links a.is-active {
+  border-color: var(--focus);
+  color: var(--accent);
+}
+
+.admin-data-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  background: var(--surface);
+}
+
+.admin-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.admin-data-table th,
+.admin-data-table td {
+  padding: 0.48rem 0.55rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.admin-data-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.admin-data-table th {
+  color: var(--muted);
+  font-size: 0.68rem;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+.admin-data-table td small {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.admin-data-table .numeric-cell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-health-cell {
+  max-width: 17rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--danger);
+}
+
+.admin-table-actions a {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.admin-table-actions a:hover {
+  text-decoration: underline;
+}
+
+.admin-success-note {
+  margin: 0 0 1rem;
+  color: var(--accent);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.admin-warning-text {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.admin-compact-stats,
+.admin-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin: 0 0 1.2rem;
+}
+
+.admin-compact-stats > div,
+.admin-detail-grid > div {
+  min-width: 0;
+  padding: 0.65rem;
+  border-radius: 0.5rem;
+  background: var(--surface-muted);
+}
+
+.admin-compact-stats dt,
+.admin-detail-grid dt {
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.admin-compact-stats dd,
+.admin-detail-grid dd {
+  margin: 0.2rem 0 0;
+  overflow-wrap: anywhere;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.admin-detail-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-merge-candidates {
+  display: grid;
+  gap: 0.45rem;
+  margin-bottom: 1rem;
+}
+
+.admin-merge-candidates a {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  background: var(--surface);
+  text-decoration: none;
+}
+
+.admin-merge-candidates a:hover {
+  border-color: var(--focus);
+}
+
+.admin-merge-candidates span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.admin-merge-preview {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: 1rem;
+}
+
+.admin-merge-preview h2,
+.admin-merge-copy,
+.admin-maintenance-error {
+  margin-bottom: 0;
+}
+
+.inline-alert {
+  margin: 0;
+  padding: 0.75rem 0.85rem;
+  border-left: 3px solid var(--danger);
+  background: var(--surface-muted);
+  font-size: 0.88rem;
+}
+
+.inline-alert p {
+  margin: 0.3rem 0 0;
+}
+
+.admin-maintenance-section {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 1.5rem;
+}
+
+.admin-source-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 0.9rem;
+}
+
+.admin-source-summary a {
+  display: flex;
+  gap: 0.45rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  background: var(--surface);
+  font-size: 0.75rem;
+  text-decoration: none;
+}
+
+.admin-source-summary span {
+  color: var(--muted);
+}
+
+.admin-danger-zone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding: 1rem;
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--border));
+}
+
+.admin-danger-zone h2 {
+  margin-bottom: 0.35rem;
+  font-size: 1rem;
+}
+
+.admin-danger-zone p {
+  max-width: 36rem;
+  margin-bottom: 0;
+  font-size: 0.82rem;
+}
+
+.archived-tournament-label {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.admin-tournament-row.is-archived {
+  opacity: 0.82;
+}
+
+.admin-archived-heading {
+  margin: 0.8rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+}
+
+.admin-inventory-stats {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+}
+
+.admin-game-search select {
+  flex: 0 1 12rem;
+}
+
+@media (max-width: 900px) {
+  .admin-overview-grid,
+  .admin-health-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-inventory-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .admin-danger-zone {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-wide-shell {
+    width: min(100% - 1.25rem, 78rem);
+  }
+
+  .admin-subpage-topbar,
+  .admin-section-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-search-form {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-overview-grid,
+  .admin-health-grid,
+  .admin-compact-stats,
+  .admin-detail-grid,
+  .admin-inventory-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .admin-merge-candidates a {
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+}
+
+
+.admin-error-list {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0.8rem 1rem 0.8rem 2rem;
+}
+
+.admin-error-list li {
+  font-size: 0.8rem;
+}
+
+.admin-error-list strong,
+.admin-error-list span {
+  display: block;
+}
+
+.admin-error-list span {
+  margin-top: 0.15rem;
+  color: var(--muted);
 }

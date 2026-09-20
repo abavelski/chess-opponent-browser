@@ -489,3 +489,32 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+.import-prune-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.9rem 1rem;
+}
+
+.import-prune-panel p {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+}
+
+.import-prune-panel .button {
+  min-height: 2.35rem;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .import-prune-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

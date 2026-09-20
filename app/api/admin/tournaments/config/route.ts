@@ -22,6 +22,7 @@ export async function GET(request: Request) {
         sourceUrl: tournaments.sourceUrl,
         participantGroup: tournaments.participantGroup,
         isActive: tournaments.isActive,
+        archivedAt: tournaments.archivedAt,
       })
       .from(tournaments)
       .where(selection)
@@ -31,6 +32,13 @@ export async function GET(request: Request) {
       return NextResponse.json(
         { ok: false, message: nickname ? `Tournament '${nickname}' was not found.` : "No active tournament exists." },
         { status: 404 },
+      );
+    }
+
+    if (tournament.archivedAt) {
+      return NextResponse.json(
+        { ok: false, message: `Tournament \'${nickname || tournament.nickname}\' is archived. Restore it in Admin before syncing.` },
+        { status: 409 },
       );
     }
 

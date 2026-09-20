@@ -28,11 +28,12 @@ export async function POST(request: Request) {
 
   try {
     const db = getDb();
-    const [tournament] = await db.select({ id: tournaments.id, name: tournaments.name, nickname: tournaments.nickname })
+    const [tournament] = await db.select({ id: tournaments.id, name: tournaments.name, nickname: tournaments.nickname, archivedAt: tournaments.archivedAt })
       .from(tournaments)
       .where(eq(tournaments.nickname, tournamentNickname))
       .limit(1);
     if (!tournament) return errorResponse(`Tournament '${tournamentNickname}' was not found.`, 404);
+    if (tournament.archivedAt) return errorResponse(`Tournament '${tournamentNickname}' is archived. Restore it before syncing.`, 409);
 
     const [run] = await db.insert(syncRuns).values({ tournamentId: tournament.id, kind }).returning({
       id: syncRuns.id,
