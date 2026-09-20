@@ -71,13 +71,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           participantGroup: tournaments.participantGroup,
           isActive: tournaments.isActive,
           participantCount: sql<number>`(
-            select count(*)::int from tournament_participants tp where tp.tournament_id = ${tournaments.id}
+            select count(*)::int from tournament_participants tp where tp.tournament_id = "tournaments"."id"
           )`,
           staleDsuCount: sql<number>`(
             select count(*)::int
             from tournament_participants tp
             inner join players p on p.id = tp.player_id
-            where tp.tournament_id = ${tournaments.id}
+            where tp.tournament_id = "tournaments"."id"
               and p.dsu_profile_url is not null
               and (p.dsu_rating_updated_at is null or p.dsu_rating_updated_at < now() - interval '30 days')
           )`,
@@ -85,7 +85,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             select count(*)::int
             from tournament_participants tp
             inner join players p on p.id = tp.player_id
-            where tp.tournament_id = ${tournaments.id}
+            where tp.tournament_id = "tournaments"."id"
               and (p.fide_id is not null or p.fide_profile_url is not null)
               and (p.fide_rating_updated_at is null or p.fide_rating_updated_at < now() - interval '30 days')
           )`,
