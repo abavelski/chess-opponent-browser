@@ -36,8 +36,12 @@ export async function POST(request: Request) {
 
   const nameInput = formData.get("name");
   const aliasesInput = formData.get("aliases");
+  const tournamentNicknameInput = formData.get("tournamentNickname");
   const uploaded = formData.get("pgnFile");
   const canonicalName = typeof nameInput === "string" ? nameInput.trim() : "";
+  const tournamentNickname = typeof tournamentNicknameInput === "string"
+    ? tournamentNicknameInput.trim().toLowerCase()
+    : "";
   let requestedAliases: string[] = [];
   if (typeof aliasesInput === "string" && aliasesInput) {
     try {
@@ -59,6 +63,9 @@ export async function POST(request: Request) {
       `Opponent name must be ${PLAYER_NAME_MAX_LENGTH} characters or fewer.`,
       400,
     );
+  }
+  if (tournamentNickname && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(tournamentNickname)) {
+    return errorResponse("Tournament nickname is invalid.", 400);
   }
   if (!(uploaded instanceof File)) {
     return errorResponse("Attach the extracted PGN as pgnFile.", 400);
@@ -118,14 +125,23 @@ export async function POST(request: Request) {
 
   try {
     const db = getDb();
-    const [activeTournament] = await db
-      .select({ id: tournaments.id, name: tournaments.name })
+    const [targetTournament] = await db
+      .select({ id: tournaments.id, name: tournaments.name, nickname: tournaments.nickname })
       .from(tournaments)
-      .where(eq(tournaments.isActive, true))
+      .where(
+        tournamentNickname
+          ? eq(tournaments.nickname, tournamentNickname)
+          : eq(tournaments.isActive, true),
+      )
       .limit(1);
 
-    if (!activeTournament) {
-      return errorResponse("No active tournament exists. Activate one before importing opponents.", 409);
+    if (!targetTournament) {
+      return errorResponse(
+        tournamentNickname
+          ? `Tournament '${tournamentNickname}' was not found.`
+          : "No active tournament exists.",
+        404,
+      );
     }
 
     const result = await persistParsedImport(
@@ -137,7 +153,7 @@ export async function POST(request: Request) {
           sourceName: focalCandidate.name,
           sourceFideId: focalCandidate.fideId,
           canonicalName,
-          tournamentId: activeTournament.id,
+          tournamentId: targetTournament.id,
         },
       },
       createImportPersistenceRepository(),
@@ -155,7 +171,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       alreadyUpToDate,
-      tournament: activeTournament,
+      tournament: targetTournament,
       opponent: focal
         ? {
             id: focal.playerId,

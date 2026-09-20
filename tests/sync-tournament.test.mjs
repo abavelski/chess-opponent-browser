@@ -1,15 +1,32 @@
 import { describe, expect, it } from "vitest";
 
-import { danbaseNameVariants, filterParticipantsByGroup, identityKeys, mergeParticipants, normalizeParticipantName, parseArguments, toRating } from "../scripts/sync-tournament.mjs";
+import { assertSnapshotTarget, danbaseNameVariants, filterParticipantsByGroup, identityKeys, mergeParticipants, normalizeParticipantName, parseArguments, toRating, workspacePaths } from "../scripts/sync-tournament.mjs";
 
 describe("tournament sync CLI", () => {
-  it("uses the local Danbase path and local snapshot defaults", () => {
+  it("defers local paths until the tournament workspace is known", () => {
     expect(parseArguments([])).toMatchObject({
       command: "all",
       includeRatings: false,
-      snapshotPath: "data/participants.json",
+      snapshotPath: "",
+      packsDir: "",
       danbasePath: "C:/dev/danbase.pgn",
     });
+  });
+
+  it("isolates default snapshots and packs by tournament nickname", () => {
+    expect(workspacePaths("furesoe-open-2026")).toEqual({
+      snapshotPath: expect.stringMatching(/data[\\/]tournaments[\\/]furesoe-open-2026[\\/]participants\.json$/),
+      syncStatePath: expect.stringMatching(/data[\\/]tournaments[\\/]furesoe-open-2026[\\/]sync-state\.json$/),
+      packsDir: expect.stringMatching(/packs[\\/]furesoe-open-2026$/),
+    });
+    expect(workspacePaths("dm2026u14").snapshotPath).not.toBe(workspacePaths("furesoe-open-2026").snapshotPath);
+  });
+
+  it("rejects a snapshot for a different tournament", () => {
+    expect(() => assertSnapshotTarget({ tournamentNickname: "dm2026u14" }, "furesoe-open-2026"))
+      .toThrow("Snapshot belongs to 'dm2026u14'");
+    expect(() => assertSnapshotTarget({}, "furesoe-open-2026"))
+      .toThrow("Snapshot has no tournament nickname");
   });
 
   it("parses subcommands and overrides", () => {
@@ -21,6 +38,11 @@ describe("tournament sync CLI", () => {
     expect(parseArguments(["all", "furesoe-open"])).toMatchObject({ includeRatings: false });
     expect(parseArguments(["all", "furesoe-open", "--ratings"]))
       .toMatchObject({ includeRatings: true });
+  });
+
+  it("parses dry-run and force safety controls", () => {
+    expect(parseArguments(["all", "furesoe-open", "--dry-run", "--force"]))
+      .toMatchObject({ dryRun: true, force: true });
   });
 
   it("filters participant groups case-insensitively", () => {

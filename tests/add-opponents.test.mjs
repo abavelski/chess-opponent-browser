@@ -10,7 +10,7 @@ import {
 describe("add opponent CLI", () => {
   it("uses the expected defaults and accepts a positional opponent name", () => {
     expect(parseArguments(["Nielsen,", "Jens", "Ove", "Fries"])).toMatchObject({
-      inputPath: "~/Downloads/danbase.pgn",
+      inputPath: "C:/dev/danbase.pgn",
       namesFile: "",
       packsDir: "packs",
       positional: ["Nielsen,", "Jens", "Ove", "Fries"],
@@ -28,12 +28,15 @@ describe("add opponent CLI", () => {
         "http://localhost:3000",
         "--packs-dir",
         "./tmp/packs",
+        "--tournament",
+        "dm2026u14",
       ]),
     ).toMatchObject({
       inputPath: "/data/danbase.pgn",
       namesFile: "./names.txt",
       baseUrl: "http://localhost:3000",
       packsDir: "./tmp/packs",
+      tournamentNickname: "dm2026u14",
     });
   });
 

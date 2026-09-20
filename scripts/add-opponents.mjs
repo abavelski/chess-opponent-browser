@@ -9,7 +9,7 @@ import { pathToFileURL } from "node:url";
 import { extractOpponentPgn } from "./extract-opponent.mjs";
 
 const DEFAULT_URL = "https://chess-opponent-browser.vercel.app";
-const DEFAULT_INPUT = "~/Downloads/danbase.pgn";
+const DEFAULT_INPUT = "C:/dev/danbase.pgn";
 
 export function expandHome(filePath) {
   if (filePath === "~") return homedir();
@@ -50,6 +50,7 @@ export function parseArguments(argv) {
     namesFile: "",
     baseUrl: process.env.OPPONENT_BROWSER_URL || DEFAULT_URL,
     packsDir: "packs",
+    tournamentNickname: "",
     positional: [],
     help: false,
   };
@@ -62,7 +63,7 @@ export function parseArguments(argv) {
       continue;
     }
 
-    if (["--input", "-i", "--file", "-f", "--url", "-u", "--packs-dir"].includes(argument)) {
+    if (["--input", "-i", "--file", "-f", "--url", "-u", "--packs-dir", "--tournament"].includes(argument)) {
       const value = argv[index + 1];
       if (!value || value.startsWith("--")) {
         throw new Error(`${argument} requires a value.`);
@@ -72,7 +73,8 @@ export function parseArguments(argv) {
       if (argument === "--input" || argument === "-i") options.inputPath = value;
       else if (argument === "--file" || argument === "-f") options.namesFile = value;
       else if (argument === "--url" || argument === "-u") options.baseUrl = value;
-      else options.packsDir = value;
+      else if (argument === "--packs-dir") options.packsDir = value;
+      else options.tournamentNickname = value.trim().toLowerCase();
       continue;
     }
 
@@ -102,11 +104,12 @@ function absoluteFromCwd(filePath) {
   return isAbsolute(expanded) ? expanded : resolve(expanded);
 }
 
-export async function uploadPack({ baseUrl, name, packPath, aliases = [] }) {
+export async function uploadPack({ baseUrl, name, packPath, aliases = [], tournamentNickname = "" }) {
   const rawPgn = await readFile(packPath);
   const formData = new FormData();
   formData.set("name", name);
   if (aliases.length > 0) formData.set("aliases", JSON.stringify(aliases));
+  if (tournamentNickname) formData.set("tournamentNickname", tournamentNickname);
   formData.set(
     "pgnFile",
     new Blob([rawPgn], { type: "application/x-chess-pgn" }),
@@ -133,7 +136,7 @@ export async function uploadPack({ baseUrl, name, packPath, aliases = [] }) {
   return payload;
 }
 
-export async function addOpponent({ inputPath, packsDir, baseUrl, name }) {
+export async function addOpponent({ inputPath, packsDir, baseUrl, name, tournamentNickname = "" }) {
   const outputDirectory = absoluteFromCwd(packsDir);
   await mkdir(outputDirectory, { recursive: true });
 
@@ -158,6 +161,7 @@ export async function addOpponent({ inputPath, packsDir, baseUrl, name }) {
     baseUrl,
     name,
     packPath: outputPath,
+    tournamentNickname,
   });
 
   return {
@@ -170,17 +174,18 @@ export async function addOpponent({ inputPath, packsDir, baseUrl, name }) {
 }
 
 function usage() {
-  return `Extract Danbase games and upload opponents to the active tournament.
+  return `Extract Danbase games and upload opponents to a tournament.
 
 Usage:
   npm run add-opponent -- "Opponent Name"
   npm run add-opponents -- ./opponents.txt
 
 Options:
-  -i, --input <path>      Danbase PGN (default: ~/Downloads/danbase.pgn)
+  -i, --input <path>      Danbase PGN (default: C:/dev/danbase.pgn)
   -f, --file <path>       Text file with one opponent name per line
   -u, --url <url>         App URL (default: OPPONENT_BROWSER_URL or ${DEFAULT_URL})
       --packs-dir <path>  Extracted packs folder (default: ./packs)
+      --tournament <name> Upload to this tournament nickname (default: active)
   -h, --help              Show help
 
 Blank lines and lines starting with # are ignored in names files.
@@ -201,7 +206,7 @@ export async function main(argv = process.argv.slice(2)) {
   }
 
   process.stdout.write(
-    `Danbase: ${absoluteFromCwd(options.inputPath)}\nPacks: ${absoluteFromCwd(options.packsDir)}\nTarget: ${options.baseUrl}\n\n`,
+    `Danbase: ${absoluteFromCwd(options.inputPath)}\nPacks: ${absoluteFromCwd(options.packsDir)}\nTarget: ${options.baseUrl} (${options.tournamentNickname || "active tournament"})\n\n`,
   );
 
   let failures = 0;
@@ -215,6 +220,7 @@ export async function main(argv = process.argv.slice(2)) {
         packsDir: options.packsDir,
         baseUrl: options.baseUrl,
         name,
+        tournamentNickname: options.tournamentNickname,
       });
 
       if (result.status === "not-found") {

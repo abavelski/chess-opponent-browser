@@ -77,7 +77,7 @@ FIXTURE_SEED_TARGET=preview npm run db:seed:task-003
 
 ## Tournament synchronization
 
-The tournament sync keeps an authoritative local participant snapshot in `data/participants.json` (gitignored), reconciles the active tournament roster, extracts each participant's Danbase games, and uploads the resulting PGN packs. It is safe to run repeatedly: removed participants leave only the tournament roster, while global players and games remain; existing games are deduplicated. The normal workflow preserves previously fetched ratings without requesting DSU or FIDE pages.
+The tournament sync keeps a separate gitignored workspace under `data/tournaments/<nickname>/`, reconciles that tournament's roster, extracts each participant's Danbase games into `packs/<nickname>/`, and uploads the resulting PGN packs to the same explicit tournament. It is safe to run repeatedly: removed participants leave only the tournament roster, while global players and games remain; existing games are deduplicated. The normal workflow preserves previously fetched ratings without requesting DSU or FIDE pages.
 
 Run the complete workflow:
 
@@ -91,18 +91,26 @@ To explicitly refresh DSU and FIDE ratings as part of the complete workflow:
 npm run sync-tournament -- furesoe-open-2026 --ratings
 ```
 
+Preview participant changes and game packs without changing the hosted database. The refreshed snapshot, extracted packs, and `sync-state.json` remain in the local tournament workspace:
+
+```bash
+npm run sync-tournament -- furesoe-open-2026 --dry-run
+```
+
+Roster removals above 25% are rejected unless the reviewed run is repeated with `--force`.
+
 Individual stages are also available:
 
 ```bash
 npm run sync-participants -- furesoe-open-2026 # refresh additions/removals from the saved URL/group
-npm run sync-ratings      # refresh both DSU and FIDE ratings in the local file
-npm run sync-dsu
-npm run sync-fide
-npm run sync-app          # reconcile the local file with the active app tournament
-npm run sync-games        # scan Danbase once, then upload one pack per participant
+npm run sync-ratings -- furesoe-open-2026 # refresh ratings in this tournament workspace
+npm run sync-dsu -- furesoe-open-2026
+npm run sync-fide -- furesoe-open-2026
+npm run sync-app -- furesoe-open-2026     # reconcile this tournament's local snapshot
+npm run sync-games -- furesoe-open-2026   # upload packs to this exact tournament
 ```
 
-The nickname fetches the tournament URL and optional participant group from the app. A group-filtered sync reconciles the roster, removing participants outside that group while preserving global players and games. Defaults are `C:\dev\danbase.pgn`, `data/participants.json`, `packs/`, and the Production app URL. Override them with `--url`, `--danbase`, `--file`, `--packs-dir`, and `--app-url`. New tournaments are inactive; use **Make active** on `/admin` before syncing one. Only the active tournament can be synced.
+The nickname fetches that exact tournament's URL and optional participant group from the app, whether or not it is active. Omit the nickname to use the active tournament. A group-filtered sync reconciles only the selected roster while preserving global players and games. Defaults are `C:\dev\danbase.pgn`, per-tournament snapshot/pack paths, and the Production app URL. Override them with `--url`, `--danbase`, `--file`, `--packs-dir`, and `--app-url`. The browser's active tournament is never changed by CLI synchronization.
 
 If Danbase uses an older spelling for a player, add a local `danbaseAliases` array to that player in the snapshot. Participant refreshes preserve this local field.
 

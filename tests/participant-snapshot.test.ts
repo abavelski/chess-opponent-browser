@@ -45,4 +45,15 @@ describe("parseParticipantSnapshot", () => {
       players: [{ name: "19. Nikolaj Bavelski", dsuId: "100105169" }],
     }).players[0].name).toBe("Nikolaj Bavelski");
   });
+
+  it("normalizes and validates tournament nicknames", () => {
+    expect(parseParticipantSnapshot({
+      tournamentNickname: " FURESOE-OPEN ",
+      players: [],
+    }).tournamentNickname).toBe("furesoe-open");
+    expect(() => parseParticipantSnapshot({
+      tournamentNickname: "../other-tournament",
+      players: [],
+    })).toThrow("Tournament nickname is invalid");
+  });
 });

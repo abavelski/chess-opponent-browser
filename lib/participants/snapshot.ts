@@ -99,8 +99,13 @@ export function parseParticipantSnapshot(value: unknown): ParticipantSnapshot {
     if (player.fideId) seenFide.add(player.fideId);
   }
 
+  const tournamentNickname = optionalText(input.tournamentNickname, 80)?.toLowerCase() ?? null;
+  if (tournamentNickname && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(tournamentNickname)) {
+    throw new Error("Tournament nickname is invalid.");
+  }
+
   return {
-    tournamentNickname: optionalText(input.tournamentNickname, 80),
+    tournamentNickname,
     participantGroup: optionalText(input.participantGroup, 120),
     sourceUrl: profileUrl(input.sourceUrl),
     extractedAt: timestamp(input.extractedAt),

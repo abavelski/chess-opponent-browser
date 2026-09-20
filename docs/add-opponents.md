@@ -1,6 +1,6 @@
 # Extract and upload opponents from Danbase
 
-The local opponent CLI extracts small PGN packs from a large Danbase file and uploads them directly into the active tournament.
+The local opponent CLI extracts small PGN packs from a large Danbase file and uploads them directly into the active tournament, or into an explicit tournament nickname.
 
 The full Danbase file never leaves your computer. Only each extracted opponent pack is sent to the app. Extracted packs are kept under `./packs` by default.
 
@@ -15,7 +15,7 @@ npm run add-opponent -- "Nielsen, Jens Ove Fries"
 The default source database is:
 
 ```text
-~/Downloads/danbase.pgn
+C:/dev/danbase.pgn
 ```
 
 Override it when needed:
@@ -51,6 +51,7 @@ The command extracts and uploads each opponent sequentially.
 -f, --file <path>       Text file with one opponent name per line
 -u, --url <url>         App URL
     --packs-dir <path>  Extracted packs folder (default: ./packs)
+    --tournament <name> Explicit tournament nickname (default: active)
 -h, --help              Show help
 ```
 
@@ -75,6 +76,6 @@ The CLI posts each extracted pack to:
 POST /api/admin/opponents/import
 ```
 
-The endpoint selects the same active tournament as the front page: the newest tournament. It expects multipart form data with `name` and `pgnFile`.
+The endpoint accepts multipart form data with `name`, `pgnFile`, and an optional `tournamentNickname`. An explicit nickname targets that tournament directly; when omitted, the endpoint uses the active tournament.
 
 This endpoint is intentionally unauthenticated for the current personal-project setup.
