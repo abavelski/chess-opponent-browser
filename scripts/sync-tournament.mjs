@@ -693,6 +693,7 @@ export async function syncLichessGames(options) {
         name,
         names: danbaseNameVariants(name),
         fideIds: [player.fideId],
+        skipGamesWithoutMoves: true,
         outputPath: join(playerDirectory, packFilename(name)),
       };
     }),

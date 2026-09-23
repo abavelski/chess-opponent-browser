@@ -137,6 +137,42 @@ describe("local opponent PGN extraction", () => {
     expect(await readFile(secondOutput, "utf8")).toContain('Not selected');
   });
 
+  it("can omit broadcast placeholders that contain no moves", async () => {
+    const { inputPath, outputPath } = await tempFiles();
+    await writeFile(inputPath, `[Event "Pending board"]
+[White "Tursic, Benjamin"]
+[WhiteFideId "1482475"]
+[Black "Other Player"]
+[Result "*"]
+
+*
+
+[Event "Finished board"]
+[White "Tursic, Benjamin"]
+[WhiteFideId "1482475"]
+[Black "Other Player"]
+[Result "1-0"]
+
+1. e4 e5 1-0
+`, "utf8");
+
+    const summary = await extractOpponentPacks({
+      inputPath,
+      opponents: [{
+        name: "Benjamin Tursic",
+        fideIds: ["1482475"],
+        skipGamesWithoutMoves: true,
+        outputPath,
+      }],
+    });
+    const output = await readFile(outputPath, "utf8");
+
+    expect(summary.scanned).toBe(2);
+    expect(summary.opponents[0].matched).toBe(1);
+    expect(output).toContain('Finished board');
+    expect(output).not.toContain('Pending board');
+  });
+
   it("ends comments whose closing brace follows a backslash", async () => {
     const { inputPath, outputPath } = await tempFiles();
     const pgnWithDanbaseAnnotation = String.raw`[Event "Annotated game"]

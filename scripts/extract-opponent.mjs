@@ -44,6 +44,13 @@ export function gameMatchesPlayer(tags, normalizedNames) {
   return normalizedNames.has(white) || normalizedNames.has(black);
 }
 
+export function gameHasMoves(lines) {
+  const movetext = lines
+    .filter((line) => !tagLinePattern.test(line) && line.trim() !== "")
+    .join(" ");
+  return /\b\d+\.(?:\.\.)?\s*(?!\*|1-0|0-1|1\/2-1\/2)\S+/.test(movetext);
+}
+
 export function gameMatchesTarget(tags, normalizedNames, fideIds = new Set()) {
   const whiteFideId = String(tags.whitefideid ?? "").trim();
   const blackFideId = String(tags.blackfideid ?? "").trim();
@@ -226,6 +233,7 @@ export async function extractOpponentPacks({ inputPath, opponents }) {
     if (text) {
       for (const target of targets) {
         if (!gameMatchesTarget(tags, target.normalizedNames, target.fideIds)) continue;
+        if (target.skipGamesWithoutMoves && !gameHasMoves(currentLines)) continue;
         if (target.matched > 0) await writeChunk(target.output, "\n\n");
         await writeChunk(target.output, text);
         target.matched += 1;
