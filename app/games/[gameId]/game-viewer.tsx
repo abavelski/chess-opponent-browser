@@ -27,7 +27,6 @@ type NotationLineProps = {
   lineId: string;
   selected: ReplaySelection;
   onSelect: (selection: ReplaySelection) => void;
-  depth?: number;
 };
 
 function notationPrefix(moveNumber: number, side: "white" | "black") {
@@ -45,29 +44,25 @@ function isTypingTarget(target: EventTarget | null) {
   );
 }
 
-function NotationLine({ replay, lineId, selected, onSelect, depth = 0 }: NotationLineProps) {
+function NotationLine({ replay, lineId, selected, onSelect }: NotationLineProps) {
   const line = findReplayLine(replay, lineId);
   if (!line) return null;
 
   return (
-    <div className={depth === 0 ? "notation-line" : "notation-line variation-line"}>
+    <div className="notation-line">
       {pairReplayMoves(line.moves).map((row) => (
         <div className="notation-row" key={`${line.id}:${row.moveNumber}`}>
           <span className="notation-number">{row.moveNumber}.</span>
           <NotationMoveCell
-            depth={depth}
             entry={row.white}
             lineId={line.id}
             onSelect={onSelect}
-            replay={replay}
             selected={selected}
           />
           <NotationMoveCell
-            depth={depth}
             entry={row.black}
             lineId={line.id}
             onSelect={onSelect}
-            replay={replay}
             selected={selected}
           />
         </div>
@@ -77,19 +72,15 @@ function NotationLine({ replay, lineId, selected, onSelect, depth = 0 }: Notatio
 }
 
 function NotationMoveCell({
-  replay,
   lineId,
   entry,
   selected,
   onSelect,
-  depth,
 }: {
-  replay: ReplayDocument;
   lineId: string;
   entry: ReplayMoveEntry | null;
   selected: ReplaySelection;
   onSelect: (selection: ReplaySelection) => void;
-  depth: number;
 }) {
   if (!entry) return <span aria-hidden="true" className="notation-cell notation-cell-empty" />;
   const { move, index } = entry;
@@ -106,21 +97,6 @@ function NotationMoveCell({
       >
         {move.san}
       </button>
-
-      {move.comment ? <p className="move-comment">{move.comment}</p> : null}
-
-      {move.variationLineIds.map((variationLineId) => (
-        <div className="variation-block" key={variationLineId}>
-          <span className="variation-label">Variation</span>
-          <NotationLine
-            depth={depth + 1}
-            lineId={variationLineId}
-            onSelect={onSelect}
-            replay={replay}
-            selected={selected}
-          />
-        </div>
-      ))}
     </div>
   );
 }

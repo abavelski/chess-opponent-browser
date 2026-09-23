@@ -182,6 +182,7 @@ describe("PGN import persistence", () => {
     expect(saved[0].blackPlayerId).toBe(8);
     expect(saved[0].game.white).toBe("Completely Unknown");
     expect(saved[0].fingerprint).toMatch(/^[0-9a-f]{32}$/);
+    expect(saved[0].moveFingerprint).toBeNull();
   });
 
   it("creates a focal Player, adds it to the roster, and links the matching side", async () => {

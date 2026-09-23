@@ -229,42 +229,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.move-comment {
-  margin: 0.1rem 0 0.3rem;
-  padding: 0.55rem 0.7rem;
-  border-left: 3px solid var(--focus);
-  background: var(--surface-muted);
-  color: #465047;
-  font-size: 0.88rem;
-  line-height: 1.5;
-}
-
-.variation-block {
-  margin: 0.15rem 0 0.35rem;
-  padding: 0.55rem 0.65rem;
-  border-left: 2px solid var(--border);
-  border-radius: 0 0.5rem 0.5rem 0;
-  background: #fafbf8;
-}
-
-.variation-label {
-  display: block;
-  margin-bottom: 0.35rem;
-  color: var(--muted);
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.variation-line {
-  gap: 0.15rem;
-}
-
-.variation-line .notation-row {
-  grid-template-columns: 1.8rem repeat(2, minmax(0, 1fr));
-}
-
 .viewer-unavailable {
   margin-top: 1.25rem;
 }
@@ -381,17 +345,6 @@
 .compact-viewer-layout .notation-number {
   padding-top: 0.55rem;
   font-size: 0.7rem;
-}
-
-.compact-viewer-layout .move-comment {
-  margin-bottom: 0.2rem;
-  padding: 0.4rem 0.55rem;
-  font-size: 0.8rem;
-}
-
-.compact-viewer-layout .variation-block {
-  margin-left: 0.55rem;
-  padding: 0.4rem 0.5rem;
 }
 
 @media (max-width: 1120px) {

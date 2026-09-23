@@ -38,3 +38,48 @@ export function createGameFingerprint(game: PgnPreviewGame) {
   const canonical = canonicalGameFingerprintInput(game);
   return canonical ? createHash("md5").update(canonical).digest("hex") : null;
 }
+
+/**
+ * Date-independent identity for games whose players have both been resolved.
+ * Some sources attach an event or publication date instead of the game date.
+ */
+export function canonicalMoveFingerprintInput(
+  game: PgnPreviewGame,
+  identities: {
+    whitePlayerId: number | null;
+    blackPlayerId: number | null;
+    whiteFideId?: string | null;
+    blackFideId?: string | null;
+  },
+) {
+  const moves = game.structuredMoves.mainline.map((move) => move.uci.trim());
+  const whiteFideId = game.whiteFideId?.trim() || identities.whiteFideId?.trim();
+  const blackFideId = game.blackFideId?.trim() || identities.blackFideId?.trim();
+  const white = whiteFideId
+    ? `fide:${whiteFideId}`
+    : identities.whitePlayerId === null
+      ? null
+      : `player:${identities.whitePlayerId}`;
+  const black = blackFideId
+    ? `fide:${blackFideId}`
+    : identities.blackPlayerId === null
+      ? null
+      : `player:${identities.blackPlayerId}`;
+
+  if (!white || !black || moves.length < 12 || moves.some((move) => !move)) return null;
+
+  return ["v2", white, black, game.result, moves.join(" ")].join("|");
+}
+
+export function createMoveFingerprint(
+  game: PgnPreviewGame,
+  identities: {
+    whitePlayerId: number | null;
+    blackPlayerId: number | null;
+    whiteFideId?: string | null;
+    blackFideId?: string | null;
+  },
+) {
+  const canonical = canonicalMoveFingerprintInput(game, identities);
+  return canonical ? createHash("md5").update(canonical).digest("hex") : null;
+}

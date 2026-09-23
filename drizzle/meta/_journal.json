@@ -78,6 +78,13 @@
       "when": 1789899000000,
       "tag": "0010_admin_data_health",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790193284481,
+      "tag": "0011_typical_celestials",
+      "breakpoints": true
     }
   ]
 }

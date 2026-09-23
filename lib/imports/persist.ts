@@ -1,5 +1,5 @@
 import type { PgnPreview, PgnPreviewGame } from "./pgn";
-import { createGameFingerprint } from "./fingerprint";
+import { createGameFingerprint, createMoveFingerprint } from "./fingerprint";
 
 export type CanonicalPlayerIdentity = {
   id: number;
@@ -31,6 +31,7 @@ export type SaveImportedGameUnit = {
   sourceId: number;
   game: PgnPreviewGame;
   fingerprint: string | null;
+  moveFingerprint: string | null;
   whitePlayerId: number | null;
   blackPlayerId: number | null;
 };
@@ -358,6 +359,16 @@ export async function persistParsedImport(
           sourceId: source.id,
           game,
           fingerprint: createGameFingerprint(game),
+          moveFingerprint: createMoveFingerprint(game, {
+            whitePlayerId: requestedWhitePlayerId,
+            blackPlayerId: requestedBlackPlayerId,
+            whiteFideId: requestedWhitePlayerId === null
+              ? null
+              : identities.byId.get(requestedWhitePlayerId)?.fideId,
+            blackFideId: requestedBlackPlayerId === null
+              ? null
+              : identities.byId.get(requestedBlackPlayerId)?.fideId,
+          }),
           whitePlayerId: requestedWhitePlayerId,
           blackPlayerId: requestedBlackPlayerId,
         });

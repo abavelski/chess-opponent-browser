@@ -38,6 +38,9 @@ async function saveGameUnit(input: SaveImportedGameUnit): Promise<SaveImportedGa
   const db = getDb();
   const movesJson = JSON.stringify(input.game.structuredMoves);
   const tagsJson = JSON.stringify(input.game.tags);
+  const conflictTarget = input.moveFingerprint
+    ? sql`("move_fingerprint")`
+    : sql`("duplicate_fingerprint")`;
 
   const result = await db.execute(sql`
     with upserted_game as (
@@ -45,20 +48,34 @@ async function saveGameUnit(input: SaveImportedGameUnit): Promise<SaveImportedGa
         "white_player_id", "black_player_id", "white_name", "black_name",
         "white_rating", "black_rating", "white_fide_id", "black_fide_id",
         "played_on", "result", "event", "site", "round", "eco", "opening",
-        "source_id", "source_game_key", "duplicate_fingerprint", "original_pgn", "structured_moves"
+        "source_id", "source_game_key", "duplicate_fingerprint", "move_fingerprint",
+        "original_pgn", "structured_moves"
       ) values (
         ${input.whitePlayerId}, ${input.blackPlayerId}, ${input.game.white}, ${input.game.black},
         ${input.game.whiteRating}, ${input.game.blackRating},
         ${storableFideId(input.game.whiteFideId)}, ${storableFideId(input.game.blackFideId)},
         ${input.game.playedOn}, ${input.game.result}, ${input.game.event}, ${input.game.site},
         ${input.game.round}, ${input.game.eco}, ${input.game.opening}, ${input.sourceId}, null,
-        ${input.fingerprint}, ${input.game.originalPgn}, ${movesJson}::jsonb
+        ${input.fingerprint}, ${input.moveFingerprint}, ${input.game.originalPgn}, ${movesJson}::jsonb
       )
-      on conflict ("duplicate_fingerprint") do update set
+      on conflict ${conflictTarget} do update set
         "white_player_id" = coalesce("games"."white_player_id", excluded."white_player_id"),
         "black_player_id" = coalesce("games"."black_player_id", excluded."black_player_id"),
         "white_fide_id" = coalesce("games"."white_fide_id", excluded."white_fide_id"),
-        "black_fide_id" = coalesce("games"."black_fide_id", excluded."black_fide_id")
+        "black_fide_id" = coalesce("games"."black_fide_id", excluded."black_fide_id"),
+        "move_fingerprint" = coalesce("games"."move_fingerprint", excluded."move_fingerprint"),
+        "source_id" = case
+          when (excluded."original_pgn" like '%[%eval %' or excluded."original_pgn" like '%[%clk %')
+            and not ("games"."original_pgn" like '%[%eval %' or "games"."original_pgn" like '%[%clk %')
+          then excluded."source_id" else "games"."source_id" end,
+        "original_pgn" = case
+          when (excluded."original_pgn" like '%[%eval %' or excluded."original_pgn" like '%[%clk %')
+            and not ("games"."original_pgn" like '%[%eval %' or "games"."original_pgn" like '%[%clk %')
+          then excluded."original_pgn" else "games"."original_pgn" end,
+        "structured_moves" = case
+          when (excluded."original_pgn" like '%[%eval %' or excluded."original_pgn" like '%[%clk %')
+            and not ("games"."original_pgn" like '%[%eval %' or "games"."original_pgn" like '%[%clk %')
+          then excluded."structured_moves" else "games"."structured_moves" end
       returning "id", "white_player_id", "black_player_id", (xmax = 0) as "inserted"
     ),
     inserted_item as (

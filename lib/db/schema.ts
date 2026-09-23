@@ -241,6 +241,7 @@ export const games = pgTable(
       .references(() => gameSources.id),
     sourceGameKey: varchar("source_game_key", { length: 160 }),
     duplicateFingerprint: varchar("duplicate_fingerprint", { length: 32 }),
+    moveFingerprint: varchar("move_fingerprint", { length: 32 }),
     originalPgn: text("original_pgn").notNull(),
     structuredMoves: jsonb("structured_moves").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -250,6 +251,7 @@ export const games = pgTable(
     index("games_white_player_played_on_idx").on(table.whitePlayerId, table.playedOn),
     index("games_black_player_played_on_idx").on(table.blackPlayerId, table.playedOn),
     uniqueIndex("games_duplicate_fingerprint_unique").on(table.duplicateFingerprint),
+    uniqueIndex("games_move_fingerprint_unique").on(table.moveFingerprint),
     check("games_white_name_not_blank", sql`char_length(btrim(${table.whiteName})) > 0`),
     check("games_black_name_not_blank", sql`char_length(btrim(${table.blackName})) > 0`),
     check(
