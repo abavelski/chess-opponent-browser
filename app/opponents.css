@@ -513,6 +513,33 @@
   flex: 0 0 auto;
 }
 
+.compact-game-details {
+  margin-bottom: 0.75rem;
+  padding: 0.65rem 0.8rem;
+}
+
+.compact-game-details dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.55rem 1rem;
+  margin: 0;
+}
+
+.compact-game-details dt {
+  margin-bottom: 0.15rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.compact-game-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.78rem;
+}
+
 .copy-pgn-button {
   min-height: 1.9rem;
   padding: 0.28rem 0.5rem;

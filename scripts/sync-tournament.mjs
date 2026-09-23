@@ -53,12 +53,37 @@ export function danbaseNameVariants(name) {
   const canonical = normalizeParticipantName(name);
   const withoutTitle = canonical.replace(/^(?:GM|IM|FM|CM|WGM|WIM|WFM|WCM)\s+/i, "");
   const variants = new Set([canonical, withoutTitle]);
-  const parts = withoutTitle.split(" ");
-  if (parts.length > 1) {
-    const surname = parts.at(-1);
-    const givenNames = parts.slice(0, -1).join(" ");
-    variants.add(`${surname}, ${givenNames}`);
-    variants.add(`${surname},${givenNames}`);
+  const substitutions = {
+    æ: ["ae", "a"],
+    ø: ["oe", "o"],
+    å: ["aa", "a"],
+  };
+  const expand = (value, start = 0) => {
+    const characters = [...value];
+    const position = characters.findIndex(
+      (character, index) => index >= start && substitutions[character],
+    );
+    if (position === -1) {
+      variants.add(value);
+      return;
+    }
+    for (const replacement of substitutions[characters[position]]) {
+      const next = [...characters];
+      next.splice(position, 1, replacement);
+      expand(next.join(""), position + replacement.length);
+    }
+  };
+  expand(canonical);
+  expand(withoutTitle);
+
+  for (const value of [...variants]) {
+    const parts = value.split(" ");
+    if (parts.length > 1) {
+      const surname = parts.at(-1);
+      const givenNames = parts.slice(0, -1).join(" ");
+      variants.add(`${surname}, ${givenNames}`);
+      variants.add(`${surname},${givenNames}`);
+    }
   }
   return [...variants].filter(Boolean);
 }
@@ -518,6 +543,7 @@ export async function syncGames(options) {
           baseUrl: options.appUrl,
           name,
           aliases: danbaseNameVariants(name),
+          fideId: player.fideId ?? "",
           packPath: pack.outputPath,
           tournamentNickname: options.nickname,
         });

@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 
 import { GameViewer } from "@/app/games/[gameId]/game-viewer";
 import { getDb } from "@/lib/db";
-import { games, players, tournamentParticipants, tournaments } from "@/lib/db/schema";
+import { gameSources, games, players, tournamentParticipants, tournaments } from "@/lib/db/schema";
 import {
   buildGameFilterPlan,
   defaultGameFilters,
@@ -37,6 +37,12 @@ type CompactGameItem = {
 };
 
 type SelectedGame = CompactGameItem & {
+  event: string | null;
+  site: string | null;
+  round: string | null;
+  eco: string | null;
+  opening: string | null;
+  sourceLabel: string;
   replay: ReplayDocument | null;
   orientation: "white" | "black";
   originalPgn: string;
@@ -206,10 +212,17 @@ export default async function PlayerPage({ params, searchParams }: PlayerPagePro
             result: games.result,
             whitePlayerId: games.whitePlayerId,
             blackPlayerId: games.blackPlayerId,
+            event: games.event,
+            site: games.site,
+            round: games.round,
+            eco: games.eco,
+            opening: games.opening,
+            sourceLabel: gameSources.label,
             originalPgn: games.originalPgn,
             structuredMoves: games.structuredMoves,
           })
           .from(games)
+          .innerJoin(gameSources, eq(games.sourceId, gameSources.id))
           .where(eq(games.id, selectedGameId))
           .limit(1);
 
@@ -222,6 +235,12 @@ export default async function PlayerPage({ params, searchParams }: PlayerPagePro
             blackRating: row.blackRating,
             date: row.playedOn,
             result: row.result,
+            event: row.event,
+            site: row.site,
+            round: row.round,
+            eco: row.eco,
+            opening: row.opening,
+            sourceLabel: row.sourceLabel,
             replay: buildReplayDocument(row.structuredMoves),
             orientation: row.blackPlayerId === playerId ? "black" : "white",
             originalPgn: row.originalPgn,
@@ -358,6 +377,57 @@ export default async function PlayerPage({ params, searchParams }: PlayerPagePro
                       <CopyPgnButton pgn={selectedGame.originalPgn} />
                     </div>
                   </div>
+
+                  <section aria-label="Selected game details" className="panel compact-game-details">
+                    <dl>
+                      <div>
+                        <dt>Tournament</dt>
+                        <dd>{detail.tournamentName}</dd>
+                      </div>
+                      {selectedGame.event ? (
+                        <div>
+                          <dt>Event</dt>
+                          <dd>{selectedGame.event}</dd>
+                        </div>
+                      ) : null}
+                      {selectedGame.site ? (
+                        <div>
+                          <dt>Place</dt>
+                          <dd>{selectedGame.site}</dd>
+                        </div>
+                      ) : null}
+                      {selectedGame.date ? (
+                        <div>
+                          <dt>Date</dt>
+                          <dd>{selectedGame.date}</dd>
+                        </div>
+                      ) : null}
+                      <div>
+                        <dt>Ratings</dt>
+                        <dd>
+                          {selectedGame.whiteRating ?? "—"} / {selectedGame.blackRating ?? "—"}
+                        </dd>
+                      </div>
+                      {selectedGame.round ? (
+                        <div>
+                          <dt>Round</dt>
+                          <dd>{selectedGame.round}</dd>
+                        </div>
+                      ) : null}
+                      {selectedGame.eco || selectedGame.opening ? (
+                        <div>
+                          <dt>Opening</dt>
+                          <dd>
+                            {[selectedGame.eco, selectedGame.opening].filter(Boolean).join(" · ")}
+                          </dd>
+                        </div>
+                      ) : null}
+                      <div>
+                        <dt>Source</dt>
+                        <dd>{selectedGame.sourceLabel}</dd>
+                      </div>
+                    </dl>
+                  </section>
 
                   {selectedGame.replay ? (
                     <GameViewer

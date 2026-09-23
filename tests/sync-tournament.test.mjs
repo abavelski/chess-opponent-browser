@@ -105,6 +105,8 @@ describe("tournament sync CLI", () => {
   it("generates Danbase surname-first variants and removes titles", () => {
     expect(danbaseNameVariants("CM Karl Emil Nielsen-Refs")).toContain("Nielsen-Refs, Karl Emil");
     expect(danbaseNameVariants("Luis Alzaga")).toContain("Alzaga,Luis");
+    expect(danbaseNameVariants("Mathilde Rath Vesterbæk")).toContain("Vesterbaek, Mathilde Rath");
+    expect(danbaseNameVariants("Jonas Bøgh Larsen")).toContain("Larsen, Jonas Bogh");
   });
 
   it("removes tournament seed numbers from participant names and Danbase variants", () => {

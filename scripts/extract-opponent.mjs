@@ -17,6 +17,44 @@ export function normalizePlayerName(value) {
     .toLowerCase();
 }
 
+export function playerNameVariants(value, includeReordered = true) {
+  const normalized = normalizePlayerName(value);
+  const variants = new Set([normalized]);
+  const substitutions = {
+    æ: ["ae", "a"],
+    ø: ["oe", "o"],
+    å: ["aa", "a"],
+  };
+
+  function expand(input, start = 0) {
+    const characters = [...input];
+    const position = characters.findIndex(
+      (character, index) => index >= start && substitutions[character],
+    );
+    if (position === -1) {
+      variants.add(input);
+      return;
+    }
+
+    for (const replacement of substitutions[characters[position]]) {
+      const next = [...characters];
+      next.splice(position, 1, replacement);
+      expand(next.join(""), position + replacement.length);
+    }
+  }
+
+  if (normalized) expand(normalized);
+  if (includeReordered) {
+    for (const variant of [...variants]) {
+      if (variant.includes(",")) continue;
+      const parts = variant.split(" ");
+      if (parts.length < 2) continue;
+      variants.add(`${parts.at(-1)},${parts.slice(0, -1).join(" ")}`);
+    }
+  }
+  return [...variants].filter(Boolean);
+}
+
 function unescapeTag(value) {
   return value.replace(/\\"/g, '"').replace(/\\\\/g, "\\");
 }
@@ -39,9 +77,9 @@ function gameText(lines) {
 }
 
 export function gameMatchesPlayer(tags, normalizedNames) {
-  const white = normalizePlayerName(tags.white);
-  const black = normalizePlayerName(tags.black);
-  return normalizedNames.has(white) || normalizedNames.has(black);
+  const white = playerNameVariants(tags.white, false);
+  const black = playerNameVariants(tags.black, false);
+  return white.some((name) => normalizedNames.has(name)) || black.some((name) => normalizedNames.has(name));
 }
 
 export function gameHasMoves(lines) {
@@ -88,7 +126,7 @@ export async function extractOpponentPgn({ inputPath, outputPath, names, fideIds
     throw new Error("Input and output must be different files.");
   }
 
-  const normalizedNames = new Set(names.map(normalizePlayerName).filter(Boolean));
+  const normalizedNames = new Set(names.flatMap((name) => playerNameVariants(name)));
   const normalizedFideIds = new Set(fideIds.map((value) => String(value).trim()).filter(Boolean));
   if (normalizedNames.size === 0 && normalizedFideIds.size === 0) {
     throw new Error("Provide a player name or FIDE ID.");
@@ -194,7 +232,7 @@ export async function extractOpponentPacks({ inputPath, opponents }) {
   const targets = opponents.map((opponent) => ({
     ...opponent,
     outputPath: resolve(opponent.outputPath),
-    normalizedNames: new Set((opponent.names ?? [opponent.name]).map(normalizePlayerName).filter(Boolean)),
+    normalizedNames: new Set((opponent.names ?? [opponent.name]).flatMap((name) => playerNameVariants(name))),
     fideIds: new Set((opponent.fideIds ?? []).map((value) => String(value).trim()).filter(Boolean)),
     matched: 0,
     output: null,

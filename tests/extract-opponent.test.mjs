@@ -7,8 +7,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   extractOpponentPgn,
   extractOpponentPacks,
+  gameMatchesTarget,
   normalizePlayerName,
   parseArguments,
+  playerNameVariants,
 } from "../scripts/extract-opponent.mjs";
 
 const temporaryDirectories = [];
@@ -94,6 +96,37 @@ describe("local opponent PGN extraction", () => {
     expect(summary.matched).toBe(1);
     expect(output).toContain('[Event "Selected as White"]');
     expect(output).not.toContain('[Event "Selected by alias"]');
+  });
+
+  it("matches Danish letters against common Danbase ASCII spellings", async () => {
+    expect(playerNameVariants("Vesterb\u00e6k, Mathilde Rath")).toEqual(
+      expect.arrayContaining([
+        "vesterbæk,mathilde rath",
+        "vesterbaek,mathilde rath",
+      ]),
+    );
+    expect(playerNameVariants("Larsen, Jonas B\u00f8gh")).toEqual(
+      expect.arrayContaining(["larsen,jonas bøgh", "larsen,jonas bogh"]),
+    );
+
+    const { inputPath, outputPath } = await tempFiles();
+    await writeFile(inputPath, `[White "Vesterbaek, Mathilde Rath"]
+[Black "Another Player"]
+[Result "1-0"]
+
+1. e4 e5 2. Nf3 Nc6 1-0
+`);
+    const result = await extractOpponentPgn({
+      inputPath,
+      outputPath,
+      names: ["Mathilde Rath Vesterb\u00e6k"],
+    });
+    expect(gameMatchesTarget(
+      { white: "Vesterbaek, Mathilde Rath", black: "Another Player" },
+      new Set(playerNameVariants("Mathilde Rath Vesterb\u00e6k")),
+    )).toBe(true);
+    expect(result.scanned).toBe(1);
+    expect(result.matched).toBe(1);
   });
 
   it("matches a player by FIDE ID even when the source name differs", async () => {
