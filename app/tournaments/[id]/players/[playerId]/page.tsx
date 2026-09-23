@@ -380,10 +380,6 @@ export default async function PlayerPage({ params, searchParams }: PlayerPagePro
 
                   <section aria-label="Selected game details" className="panel compact-game-details">
                     <dl>
-                      <div>
-                        <dt>Tournament</dt>
-                        <dd>{detail.tournamentName}</dd>
-                      </div>
                       {selectedGame.event ? (
                         <div>
                           <dt>Event</dt>
