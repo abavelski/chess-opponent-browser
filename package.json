@@ -22,7 +22,8 @@
     "sync-dsu": "node scripts/sync-tournament.mjs dsu",
     "sync-fide": "node scripts/sync-tournament.mjs fide",
     "sync-app": "node scripts/sync-tournament.mjs app",
-    "sync-games": "node scripts/sync-tournament.mjs games"
+    "sync-games": "node scripts/sync-tournament.mjs games",
+    "sync-lichess": "node scripts/sync-tournament.mjs lichess"
   },
   "dependencies": {
     "@neondatabase/serverless": "1.1.0",

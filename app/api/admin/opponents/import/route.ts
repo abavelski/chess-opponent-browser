@@ -19,7 +19,7 @@ import { PLAYER_NAME_MAX_LENGTH } from "@/lib/players/validation";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const sourceLabel = "Danbase CLI";
+const defaultSourceLabel = "Danbase CLI";
 
 function errorResponse(message: string, status: number) {
   return NextResponse.json({ ok: false, message }, { status });
@@ -37,11 +37,17 @@ export async function POST(request: Request) {
   const nameInput = formData.get("name");
   const aliasesInput = formData.get("aliases");
   const tournamentNicknameInput = formData.get("tournamentNickname");
+  const sourceLabelInput = formData.get("sourceLabel");
+  const focalFideIdInput = formData.get("fideId");
   const uploaded = formData.get("pgnFile");
   const canonicalName = typeof nameInput === "string" ? nameInput.trim() : "";
   const tournamentNickname = typeof tournamentNicknameInput === "string"
     ? tournamentNicknameInput.trim().toLowerCase()
     : "";
+  const sourceLabel = typeof sourceLabelInput === "string"
+    ? sourceLabelInput.trim() || defaultSourceLabel
+    : defaultSourceLabel;
+  const focalFideId = typeof focalFideIdInput === "string" ? focalFideIdInput.trim() : "";
   let requestedAliases: string[] = [];
   if (typeof aliasesInput === "string" && aliasesInput) {
     try {
@@ -66,6 +72,9 @@ export async function POST(request: Request) {
   }
   if (tournamentNickname && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(tournamentNickname)) {
     return errorResponse("Tournament nickname is invalid.", 400);
+  }
+  if (focalFideId && !/^\d{4,12}$/.test(focalFideId)) {
+    return errorResponse("FIDE ID must be numeric.", 400);
   }
   if (!(uploaded instanceof File)) {
     return errorResponse("Attach the extracted PGN as pgnFile.", 400);
@@ -111,6 +120,7 @@ export async function POST(request: Request) {
     ...requestedAliases.map(normalizePackPlayerName),
   ]);
   const focalCandidate =
+    pack.candidates.find((candidate) => focalFideId && candidate.fideId === focalFideId) ??
     pack.candidates.find((candidate) => requestedKeys.has(candidate.normalizedName)) ??
     pack.candidates.find(
       (candidate) => candidate.normalizedName === pack.suggestedNormalizedName,

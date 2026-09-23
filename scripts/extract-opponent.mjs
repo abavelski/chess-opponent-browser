@@ -44,6 +44,13 @@ export function gameMatchesPlayer(tags, normalizedNames) {
   return normalizedNames.has(white) || normalizedNames.has(black);
 }
 
+export function gameMatchesTarget(tags, normalizedNames, fideIds = new Set()) {
+  const whiteFideId = String(tags.whitefideid ?? "").trim();
+  const blackFideId = String(tags.blackfideid ?? "").trim();
+  if (fideIds.has(whiteFideId) || fideIds.has(blackFideId)) return true;
+  return gameMatchesPlayer(tags, normalizedNames);
+}
+
 function parseTagLine(line) {
   const match = line.match(tagLinePattern);
   if (!match) return null;
@@ -67,7 +74,7 @@ async function writeChunk(stream, chunk) {
   });
 }
 
-export async function extractOpponentPgn({ inputPath, outputPath, names }) {
+export async function extractOpponentPgn({ inputPath, outputPath, names, fideIds = [] }) {
   const resolvedInput = resolve(inputPath);
   const resolvedOutput = resolve(outputPath);
   if (resolvedInput === resolvedOutput) {
@@ -75,8 +82,9 @@ export async function extractOpponentPgn({ inputPath, outputPath, names }) {
   }
 
   const normalizedNames = new Set(names.map(normalizePlayerName).filter(Boolean));
-  if (normalizedNames.size === 0) {
-    throw new Error("Provide a player name with --name.");
+  const normalizedFideIds = new Set(fideIds.map((value) => String(value).trim()).filter(Boolean));
+  if (normalizedNames.size === 0 && normalizedFideIds.size === 0) {
+    throw new Error("Provide a player name or FIDE ID.");
   }
 
   try {
@@ -118,7 +126,7 @@ export async function extractOpponentPgn({ inputPath, outputPath, names }) {
     }
 
     scanned += 1;
-    if (gameMatchesPlayer(tags, normalizedNames)) {
+    if (gameMatchesTarget(tags, normalizedNames, normalizedFideIds)) {
       const text = gameText(currentLines);
       if (text) {
         if (matched > 0) await writeChunk(output, "\n\n");
@@ -180,6 +188,7 @@ export async function extractOpponentPacks({ inputPath, opponents }) {
     ...opponent,
     outputPath: resolve(opponent.outputPath),
     normalizedNames: new Set((opponent.names ?? [opponent.name]).map(normalizePlayerName).filter(Boolean)),
+    fideIds: new Set((opponent.fideIds ?? []).map((value) => String(value).trim()).filter(Boolean)),
     matched: 0,
     output: null,
   }));
@@ -216,7 +225,7 @@ export async function extractOpponentPacks({ inputPath, opponents }) {
     const text = gameText(currentLines);
     if (text) {
       for (const target of targets) {
-        if (!gameMatchesPlayer(tags, target.normalizedNames)) continue;
+        if (!gameMatchesTarget(tags, target.normalizedNames, target.fideIds)) continue;
         if (target.matched > 0) await writeChunk(target.output, "\n\n");
         await writeChunk(target.output, text);
         target.matched += 1;

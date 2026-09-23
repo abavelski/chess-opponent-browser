@@ -116,7 +116,15 @@ npm run sync-dsu -- furesoe-open-2026
 npm run sync-fide -- furesoe-open-2026
 npm run sync-app -- furesoe-open-2026     # reconcile this tournament's local snapshot
 npm run sync-games -- furesoe-open-2026   # upload packs to this exact tournament
+npm run sync-lichess -- furesoe-open-2026 # import recent broadcasts by exact FIDE ID
 ```
+
+Lichess broadcast discovery is opt-in. Add `--lichess` to `sync-tournament` or
+`sync-games`, or run `sync-lichess` by itself. The command checks up to three recent
+broadcasts per FIDE-rated participant, retains source files locally, and sends only
+small player packs to the app. Historical downloads are reused; recent broadcasts are
+refetched so reruns pick up newly streamed games. See `docs/add-opponents.md` for limits
+and options.
 
 The nickname fetches that exact tournament's URL and optional participant group from the app, whether or not it is active. Omit the nickname to use the active tournament. A group-filtered sync reconciles only the selected roster while preserving global players and games. Defaults are `C:\dev\danbase.pgn`, per-tournament snapshot/pack paths, and the Production app URL. Override them with `--url`, `--danbase`, `--file`, `--packs-dir`, and `--app-url`. The browser's active tournament is never changed by CLI synchronization.
 

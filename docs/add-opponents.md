@@ -76,6 +76,44 @@ The CLI posts each extracted pack to:
 POST /api/admin/opponents/import
 ```
 
-The endpoint accepts multipart form data with `name`, `pgnFile`, and an optional `tournamentNickname`. An explicit nickname targets that tournament directly; when omitted, the endpoint uses the active tournament.
+The endpoint accepts multipart form data with `name`, `pgnFile`, and optional
+`tournamentNickname`, `sourceLabel`, `fideId`, and JSON `aliases`. An explicit nickname
+targets that tournament directly; when omitted, the endpoint uses the active tournament.
+The FIDE ID takes precedence when selecting the focal player from a pack.
 
 This endpoint is intentionally unauthenticated for the current personal-project setup.
+
+## Lichess broadcast games
+
+Players with a FIDE ID can also be matched against the recent tournaments shown on their
+Lichess FIDE profile. The command downloads each unique tournament through Lichess's
+broadcast PGN API, keeps the source PGNs and player packs locally, and uploads the player
+packs through the same deduplicating import path as Danbase.
+
+Run only the Lichess source:
+
+```bash
+npm run sync-lichess -- <tournament-nickname>
+```
+
+Or include it after the normal Danbase game sync:
+
+```bash
+npm run sync-games -- <tournament-nickname> --lichess
+```
+
+The default is the three most recent broadcasts per player. Override it with
+`--lichess-max-tournaments <1-10>`. Re-run the command to fetch newer broadcast
+snapshots and import newly completed games. `LICHESS_TOKEN` is optional; set it if
+Lichess begins rate-limiting unauthenticated requests.
+
+Local files are kept under:
+
+```text
+data/tournaments/<nickname>/lichess-broadcasts.json
+packs/<nickname>/lichess/sources/
+packs/<nickname>/lichess/players/
+```
+
+Discovery uses the participant's exact FIDE ID. Name similarity alone is never used to
+associate a Lichess profile with a canonical player.

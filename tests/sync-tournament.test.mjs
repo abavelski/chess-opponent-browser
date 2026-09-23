@@ -42,6 +42,29 @@ describe("tournament sync CLI", () => {
       .toMatchObject({ includeRatings: true, ratingMode: "stale", ratingTtlDays: 14 });
   });
 
+  it("keeps Lichess discovery opt-in and validates its request limits", () => {
+    expect(parseArguments(["all", "furesoe-open"])).toMatchObject({
+      includeLichess: false,
+      lichessMaxTournaments: 3,
+      lichessThrottleMs: 750,
+    });
+    expect(parseArguments([
+      "all",
+      "furesoe-open",
+      "--lichess",
+      "--lichess-max-tournaments",
+      "5",
+      "--lichess-throttle",
+      "1000",
+    ])).toMatchObject({
+      includeLichess: true,
+      lichessMaxTournaments: 5,
+      lichessThrottleMs: 1000,
+    });
+    expect(() => parseArguments(["lichess", "furesoe-open", "--lichess-max-tournaments", "0"]))
+      .toThrow("whole number from 1 to 10");
+  });
+
   it("selects stale provider ratings independently", () => {
     const now = new Date("2026-09-20T00:00:00Z");
     expect(isProviderRatingStale(null, 30, now)).toBe(true);

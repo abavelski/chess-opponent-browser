@@ -13,12 +13,17 @@ import {
   openDsuParticipantTable,
 } from "../lib/local/sources/dsu.mjs";
 import { fetchFideProfile } from "../lib/local/sources/fide.mjs";
+import {
+  fetchLichessBroadcastPgn,
+  fetchLichessBroadcastTour,
+  fetchLichessFideBroadcasts,
+} from "../lib/local/sources/lichess.mjs";
 
 const DEFAULT_DANBASE = "C:/dev/danbase.pgn";
 const DEFAULT_APP_URL = "https://chess-opponent-browser.vercel.app";
 const DEFAULT_TOURNAMENT_URL = "https://turnering.skak.dk/TournamentActive/Details?tourId=30508";
 const DEFAULT_RATING_TTL_DAYS = 30;
-const COMMANDS = new Set(["all", "participants", "dsu", "fide", "ratings", "app", "games"]);
+const COMMANDS = new Set(["all", "participants", "dsu", "fide", "ratings", "app", "games", "lichess"]);
 
 export function toRating(value) {
   const digits = String(value ?? "").replace(/[^\d]/g, "");
@@ -94,6 +99,9 @@ export function parseArguments(argv) {
     includeRatings: false,
     ratingMode: "none",
     ratingTtlDays: DEFAULT_RATING_TTL_DAYS,
+    includeLichess: false,
+    lichessThrottleMs: 750,
+    lichessMaxTournaments: 3,
     dryRun: false,
     force: false,
     help: false,
@@ -118,7 +126,8 @@ export function parseArguments(argv) {
     }
     else if (argument === "--dry-run") options.dryRun = true;
     else if (argument === "--force") options.force = true;
-    else if (["--file", "-f", "--url", "-u", "--danbase", "--input", "-i", "--app-url", "--packs-dir", "--throttle", "--rating-ttl-days"].includes(argument)) {
+    else if (argument === "--lichess") options.includeLichess = true;
+    else if (["--file", "-f", "--url", "-u", "--danbase", "--input", "-i", "--app-url", "--packs-dir", "--throttle", "--rating-ttl-days", "--lichess-throttle", "--lichess-max-tournaments"].includes(argument)) {
       const value = argv[++index];
       if (!value) throw new Error(`${argument} requires a value.`);
       if (argument === "--file" || argument === "-f") options.snapshotPath = value;
@@ -127,6 +136,8 @@ export function parseArguments(argv) {
       else if (argument === "--app-url") options.appUrl = value;
       else if (argument === "--packs-dir") options.packsDir = value;
       else if (argument === "--throttle") options.throttleMs = Number(value);
+      else if (argument === "--lichess-throttle") options.lichessThrottleMs = Number(value);
+      else if (argument === "--lichess-max-tournaments") options.lichessMaxTournaments = Number(value);
       else options.ratingTtlDays = Number(value);
     } else if (!argument.startsWith("-") && !options.nickname) {
       options.nickname = argument.trim().toLowerCase();
@@ -138,6 +149,12 @@ export function parseArguments(argv) {
   }
   if (!Number.isFinite(options.ratingTtlDays) || options.ratingTtlDays < 1) {
     throw new Error("--rating-ttl-days must be a positive number.");
+  }
+  if (!Number.isFinite(options.lichessThrottleMs) || options.lichessThrottleMs < 0) {
+    throw new Error("--lichess-throttle must be a non-negative number.");
+  }
+  if (!Number.isInteger(options.lichessMaxTournaments) || options.lichessMaxTournaments < 1 || options.lichessMaxTournaments > 10) {
+    throw new Error("--lichess-max-tournaments must be a whole number from 1 to 10.");
   }
   return options;
 }
@@ -224,7 +241,7 @@ export function snapshotHash(snapshot) {
 
 function syncRunKind(command) {
   if (["dsu", "fide", "ratings"].includes(command)) return "ratings";
-  if (command === "games") return "games";
+  if (["games", "lichess"].includes(command)) return "games";
   if (["participants", "app"].includes(command)) return "participants";
   return "full";
 }
@@ -540,8 +557,193 @@ export async function syncGames(options) {
   };
 }
 
+function wait(milliseconds) {
+  return milliseconds > 0
+    ? new Promise((resolveWait) => setTimeout(resolveWait, milliseconds))
+    : Promise.resolve();
+}
+
+export async function syncLichessGames(options) {
+  const snapshot = await readSnapshot(options.snapshotPath);
+  assertSnapshotTarget(snapshot, options.nickname);
+  const players = snapshot.players.filter((player) => /^\d{4,12}$/.test(String(player.fideId ?? "").trim()));
+  const lichessDirectory = resolve(options.packsDir, "lichess");
+  const sourceDirectory = join(lichessDirectory, "sources");
+  const playerDirectory = join(lichessDirectory, "players");
+  await Promise.all([
+    mkdir(sourceDirectory, { recursive: true }),
+    mkdir(playerDirectory, { recursive: true }),
+  ]);
+
+  const token = process.env.LICHESS_TOKEN || "";
+  const references = new Map();
+  const discoveryPlayers = [];
+  let discoveryFailureCount = 0;
+
+  for (const [index, player] of players.entries()) {
+    const name = normalizeParticipantName(player.name);
+    process.stdout.write(`Lichess discovery ${index + 1}/${players.length}: ${name} (${player.fideId})\n`);
+    try {
+      const found = (await fetchLichessFideBroadcasts(player.fideId, { token }))
+        .slice(0, options.lichessMaxTournaments);
+      discoveryPlayers.push({ fideId: player.fideId, name, broadcasts: found });
+      for (const reference of found) references.set(reference.roundId, reference);
+      process.stdout.write(`  ${found.length} recent broadcast(s).\n`);
+    } catch (error) {
+      if (error?.status === 429) throw error;
+      discoveryFailureCount += 1;
+      discoveryPlayers.push({
+        fideId: player.fideId,
+        name,
+        broadcasts: [],
+        error: error instanceof Error ? error.message : String(error),
+      });
+      process.stderr.write(`  discovery failed: ${error instanceof Error ? error.message : String(error)}\n`);
+    }
+    if (index < players.length - 1) await wait(options.lichessThrottleMs);
+  }
+
+  const tours = new Map();
+  let metadataFailureCount = 0;
+  const uniqueReferences = [...references.values()];
+  for (const [index, reference] of uniqueReferences.entries()) {
+    try {
+      const tour = await fetchLichessBroadcastTour(reference, { token });
+      tours.set(tour.id, tour);
+    } catch (error) {
+      if (error?.status === 429) throw error;
+      metadataFailureCount += 1;
+      process.stderr.write(`Lichess broadcast metadata failed for ${reference.title}: ${error instanceof Error ? error.message : String(error)}\n`);
+    }
+    if (index < uniqueReferences.length - 1) await wait(options.lichessThrottleMs);
+  }
+
+  const sourcePgns = [];
+  let downloadFailureCount = 0;
+  const uniqueTours = [...tours.values()];
+  for (const [index, tour] of uniqueTours.entries()) {
+    const sourcePath = join(sourceDirectory, `${tour.id}.pgn`);
+    const activityTimestamp = new Date(tour.lastActivityAt ?? "").valueOf();
+    const isHistorical = Number.isFinite(activityTimestamp)
+      && Date.now() - activityTimestamp > 14 * 24 * 60 * 60 * 1000;
+    const cachedPgn = await readFile(sourcePath, "utf8").catch(() => null);
+    try {
+      const pgn = isHistorical && cachedPgn
+        ? cachedPgn
+        : await fetchLichessBroadcastPgn(tour.id, { token });
+      if (pgn.trim()) {
+        await writeFile(sourcePath, pgn.endsWith("\n") ? pgn : `${pgn}\n`, "utf8");
+        sourcePgns.push(pgn.trim());
+        process.stdout.write(`${isHistorical && cachedPgn ? "Reused" : "Downloaded"} Lichess broadcast: ${tour.name}\n`);
+      }
+    } catch (error) {
+      if (error?.status === 429) throw error;
+      if (cachedPgn?.trim()) {
+        sourcePgns.push(cachedPgn.trim());
+        process.stderr.write(`Lichess PGN refresh failed for ${tour.name}; reused the local copy.\n`);
+      } else {
+        downloadFailureCount += 1;
+        process.stderr.write(`Lichess PGN download failed for ${tour.name}: ${error instanceof Error ? error.message : String(error)}\n`);
+      }
+    }
+    if (index < uniqueTours.length - 1) await wait(options.lichessThrottleMs);
+  }
+
+  const discoveryPath = join(dirname(resolve(options.snapshotPath)), "lichess-broadcasts.json");
+  await saveSnapshot(discoveryPath, {
+    version: 1,
+    tournamentNickname: options.nickname,
+    fetchedAt: new Date().toISOString(),
+    players: discoveryPlayers,
+    tours: uniqueTours,
+  });
+
+  const summary = {
+    eligiblePlayerCount: players.length,
+    discoveredRoundCount: references.size,
+    discoveredTourCount: tours.size,
+    downloadedTourCount: sourcePgns.length,
+    discoveryFailureCount,
+    metadataFailureCount,
+    downloadFailureCount,
+    packCount: 0,
+    noGamesCount: 0,
+    importedCount: 0,
+    duplicateCount: 0,
+    parseErrorCount: 0,
+    persistenceErrorCount: 0,
+    identityConflictCount: 0,
+  };
+
+  if (sourcePgns.length === 0 || players.length === 0) {
+    await updateSyncState(options, options.dryRun ? "lichessDryRun" : "lichess", {
+      completedAt: new Date().toISOString(),
+      ...summary,
+    });
+    return summary;
+  }
+
+  const combinedPath = join(lichessDirectory, "broadcasts.pgn");
+  await writeFile(combinedPath, `${sourcePgns.join("\n\n")}\n`, "utf8");
+  const extraction = await extractOpponentPacks({
+    inputPath: combinedPath,
+    opponents: players.map((player) => {
+      const name = normalizeParticipantName(player.name);
+      return {
+        name,
+        names: danbaseNameVariants(name),
+        fideIds: [player.fideId],
+        outputPath: join(playerDirectory, packFilename(name)),
+      };
+    }),
+  });
+
+  let uploadFailures = 0;
+  for (const [index, player] of players.entries()) {
+    const name = normalizeParticipantName(player.name);
+    const pack = extraction.opponents[index];
+    process.stdout.write(`Lichess games ${index + 1}/${players.length}: ${name}\n`);
+    try {
+      if (!pack || pack.matched === 0) {
+        summary.noGamesCount += 1;
+        process.stdout.write("  no matching broadcast games found.\n");
+      } else if (options.dryRun) {
+        summary.packCount += 1;
+        process.stdout.write(`  would upload ${pack.matched} Lichess game(s) from ${pack.outputPath}.\n`);
+      } else {
+        summary.packCount += 1;
+        const uploaded = await uploadPack({
+          baseUrl: options.appUrl,
+          name,
+          aliases: danbaseNameVariants(name),
+          fideId: player.fideId,
+          packPath: pack.outputPath,
+          sourceLabel: "Lichess Broadcasts",
+          tournamentNickname: options.nickname,
+        });
+        summary.importedCount += uploaded.import.importedCount;
+        summary.duplicateCount += uploaded.import.duplicateCount;
+        summary.parseErrorCount += uploaded.import.parseErrorCount;
+        summary.persistenceErrorCount += uploaded.import.persistenceErrorCount;
+        summary.identityConflictCount += uploaded.opponent?.conflictCount ?? 0;
+        process.stdout.write(`  ${uploaded.import.importedCount} new, ${uploaded.import.duplicateCount} duplicate.\n`);
+      }
+    } catch (error) {
+      uploadFailures += 1;
+      process.stderr.write(`  failed: ${error instanceof Error ? error.message : String(error)}\n`);
+    }
+  }
+
+  if (uploadFailures) throw new Error(`${uploadFailures} Lichess opponent upload(s) failed.`);
+  await updateSyncState(options, options.dryRun ? "lichessDryRun" : "lichess", {
+    completedAt: new Date().toISOString(),
+    ...summary,
+  });
+  return summary;
+}
+
 function usage() {
-  return `Synchronize a Danish tournament and its Danbase games.\n\nUsage:\n  npm run sync-tournament -- <nickname>\n  npm run sync-tournament -- <nickname> --ratings\n  npm run sync-tournament -- <nickname> --ratings=stale\n  npm run sync-tournament -- <nickname> --dry-run\n  npm run sync-participants -- <nickname>\n  npm run sync-ratings -- <nickname>\n  npm run sync-app -- <nickname>\n  npm run sync-games -- <nickname>\n\nThe nickname loads that exact tournament even when it is inactive. Omit it to\nuse the active tournament. Rating updates are skipped by the normal full sync\nunless --ratings or --ratings=stale is specified.\n\nCommands: all, participants, dsu, fide, ratings, app, games\nOptions:\n  -f, --file <path>       Override the per-tournament local snapshot\n  -u, --url <url>         Override the saved tournament URL for this run\n      --ratings           Refresh every DSU and FIDE rating\n      --ratings=stale     Refresh only provider ratings older than the TTL\n      --rating-ttl-days   Stale rating age (default: ${DEFAULT_RATING_TTL_DAYS})\n      --danbase <path>    Danbase PGN (default: ${DEFAULT_DANBASE})\n      --app-url <url>     Target app (default: OPPONENT_BROWSER_URL or Production)\n      --packs-dir <path>  Override the per-tournament PGN packs folder\n      --dry-run           Plan app changes and extract packs without uploading\n      --force             Allow a large participant-roster removal\n      --throttle <ms>     Delay between rating pages (default: 2500)\n`;
+  return `Synchronize a Danish tournament and its Danbase/Lichess games.\n\nUsage:\n  npm run sync-tournament -- <nickname>\n  npm run sync-tournament -- <nickname> --ratings\n  npm run sync-tournament -- <nickname> --ratings=stale\n  npm run sync-tournament -- <nickname> --lichess\n  npm run sync-tournament -- <nickname> --dry-run\n  npm run sync-participants -- <nickname>\n  npm run sync-ratings -- <nickname>\n  npm run sync-app -- <nickname>\n  npm run sync-games -- <nickname> --lichess\n  npm run sync-lichess -- <nickname>\n\nThe nickname loads that exact tournament even when it is inactive. Omit it to\nuse the active tournament. Rating updates and Lichess discovery are skipped by\nthe normal full sync unless explicitly requested. LICHESS_TOKEN is optional but\nrecommended if unauthenticated API requests become rate-limited.\n\nCommands: all, participants, dsu, fide, ratings, app, games, lichess\nOptions:\n  -f, --file <path>       Override the per-tournament local snapshot\n  -u, --url <url>         Override the saved tournament URL for this run\n      --ratings           Refresh every DSU and FIDE rating\n      --ratings=stale     Refresh only provider ratings older than the TTL\n      --rating-ttl-days   Stale rating age (default: ${DEFAULT_RATING_TTL_DAYS})\n      --danbase <path>    Danbase PGN (default: ${DEFAULT_DANBASE})\n      --lichess           Also discover and import recent Lichess broadcasts\n      --lichess-max-tournaments <n>  Recent tournaments per player (default: 3)\n      --lichess-throttle <ms>        Delay between Lichess requests (default: 750)\n      --app-url <url>     Target app (default: OPPONENT_BROWSER_URL or Production)\n      --packs-dir <path>  Override the per-tournament PGN packs folder\n      --dry-run           Plan app changes and extract packs without uploading\n      --force             Allow a large participant-roster removal\n      --throttle <ms>     Delay between rating pages (default: 2500)\n`;
 }
 
 export async function main(argv = process.argv.slice(2)) {
@@ -564,19 +766,29 @@ export async function main(argv = process.argv.slice(2)) {
       summary.stages.participants = (await syncApp(options)).participants;
     } else if (options.command === "games") {
       summary.stages.games = await syncGames(options);
+      if (options.includeLichess) summary.stages.lichess = await syncLichessGames(options);
+    } else if (options.command === "lichess") {
+      summary.stages.lichess = await syncLichessGames(options);
     } else {
       const snapshot = await refreshParticipants(options);
       summary.stages.participantsFetch = { count: snapshot.players.length };
       if (options.includeRatings) summary.stages.ratings = await refreshRatings(options, ["dsu", "fide"]);
       summary.stages.participants = (await syncApp(options)).participants;
       summary.stages.games = await syncGames(options);
+      if (options.includeLichess) summary.stages.lichess = await syncLichessGames(options);
     }
 
     const ratingFailures = summary.stages.ratings?.failed ?? 0;
     const gameErrors = (summary.stages.games?.parseErrorCount ?? 0)
       + (summary.stages.games?.persistenceErrorCount ?? 0)
       + (summary.stages.games?.identityConflictCount ?? 0);
-    const issueCount = ratingFailures + gameErrors;
+    const lichessErrors = (summary.stages.lichess?.discoveryFailureCount ?? 0)
+      + (summary.stages.lichess?.metadataFailureCount ?? 0)
+      + (summary.stages.lichess?.downloadFailureCount ?? 0)
+      + (summary.stages.lichess?.parseErrorCount ?? 0)
+      + (summary.stages.lichess?.persistenceErrorCount ?? 0)
+      + (summary.stages.lichess?.identityConflictCount ?? 0);
+    const issueCount = ratingFailures + gameErrors + lichessErrors;
     if (run) {
       await finishSyncRun(
         options,

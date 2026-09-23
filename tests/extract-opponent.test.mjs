@@ -96,6 +96,28 @@ describe("local opponent PGN extraction", () => {
     expect(output).not.toContain('[Event "Selected by alias"]');
   });
 
+  it("matches a player by FIDE ID even when the source name differs", async () => {
+    const { inputPath, outputPath } = await tempFiles();
+    await writeFile(inputPath, `[Event "Broadcast"]
+[White "Tursic, Benjamin"]
+[WhiteFideId "1482475"]
+[Black "Other Player"]
+[Result "1-0"]
+
+1. e4 e5 1-0
+`, "utf8");
+
+    const summary = await extractOpponentPgn({
+      inputPath,
+      outputPath,
+      names: ["Benjamin Tursic"],
+      fideIds: ["1482475"],
+    });
+
+    expect(summary.matched).toBe(1);
+    expect(await readFile(outputPath, "utf8")).toContain('[White "Tursic, Benjamin"]');
+  });
+
   it("extracts separate opponent packs in one Danbase scan", async () => {
     const { inputPath, outputPath } = await tempFiles();
     const secondOutput = outputPath.replace("opponent.pgn", "second.pgn");
