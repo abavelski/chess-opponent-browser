@@ -36,6 +36,10 @@ function notationPrefix(moveNumber: number, side: "white" | "black") {
   return side === "white" ? `${moveNumber}.` : `${moveNumber}...`;
 }
 
+function shortClock(clock: string) {
+  return clock.startsWith("0:") ? clock.slice(2).replace(/^0(?=\d:)/, "") : clock;
+}
+
 function isTypingTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
 
@@ -104,6 +108,10 @@ function NotationMoveCell({
     visibleClock ? `Time ${visibleClock}` : null,
     visibleEvaluation ? `Evaluation ${visibleEvaluation}` : null,
   ].filter(Boolean).join(", ");
+  const annotationText = [
+    visibleClock ? shortClock(visibleClock) : null,
+    visibleEvaluation,
+  ].filter(Boolean).join(", ");
 
   return (
     <div className="notation-cell">
@@ -115,10 +123,9 @@ function NotationMoveCell({
         type="button"
       >
         <span>{move.san}</span>
-        {visibleClock || visibleEvaluation ? (
-          <span className="notation-annotations">
-            {visibleClock ? <small title="Clock remaining">{visibleClock}</small> : null}
-            {visibleEvaluation ? <small title="Evaluation for White">{visibleEvaluation}</small> : null}
+        {annotationText ? (
+          <span className="notation-annotations" title={moveLabel}>
+            ({annotationText})
           </span>
         ) : null}
       </button>
@@ -321,7 +328,7 @@ export function GameViewer({
             ) : null}
           </div>
         ) : null}
-        <div className={`notation-scroll${compact ? " compact-notation-scroll" : ""}${showClock || showEvaluation ? " has-annotations" : ""}`}>
+        <div className={`notation-scroll${compact ? " compact-notation-scroll" : ""}`}>
           <NotationLine
             lineId={replay.mainLineId}
             onSelect={setSelection}

@@ -175,14 +175,6 @@
   padding: 1rem;
 }
 
-.notation-scroll.has-annotations {
-  overflow-x: auto;
-}
-
-.notation-scroll.has-annotations .notation-line {
-  min-width: 24rem;
-}
-
 .notation-annotation-controls {
   display: flex;
   gap: 0.4rem;
@@ -237,7 +229,7 @@
   width: 100%;
   min-height: 2.45rem;
   align-items: center;
-  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 0.3rem;
   padding: 0.35rem 0.5rem;
   border: 1px solid transparent;
@@ -250,20 +242,15 @@
 }
 
 .notation-annotations {
-  display: inline-flex;
-  gap: 0.35rem;
+  color: var(--muted);
   white-space: nowrap;
+  font-size: 0.7rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
 .notation-move > span:first-child {
   white-space: nowrap;
-}
-
-.notation-annotations small {
-  color: var(--muted);
-  font-size: 0.7rem;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
 }
 
 .notation-move:hover {
@@ -352,7 +339,7 @@
 
 /* Embedded compact game review */
 .compact-viewer-layout {
-  grid-template-columns: minmax(24rem, 38rem) minmax(14rem, 18rem);
+  grid-template-columns: minmax(24rem, 38rem) minmax(20rem, 26rem);
   justify-content: start;
   gap: 0.75rem;
 }
@@ -395,6 +382,11 @@
   padding: 0.22rem 0.34rem;
   border-radius: 0.35rem;
   font-size: 0.84rem;
+  gap: 0.2rem;
+}
+
+.compact-viewer-layout .notation-annotations {
+  font-size: 0.66rem;
 }
 
 .compact-viewer-layout .notation-number {
