@@ -13,6 +13,7 @@ import {
   type GameFilterQuery,
   type GameFilterState,
 } from "@/lib/games/filters";
+import { gameTimeControl, isUrlPlace } from "@/lib/games/annotations";
 import { buildReplayDocument, type ReplayDocument } from "@/lib/games/viewer";
 
 import { GameFilterControls } from "./filter-controls";
@@ -39,6 +40,7 @@ type CompactGameItem = {
 type SelectedGame = CompactGameItem & {
   event: string | null;
   site: string | null;
+  timeControl: string | null;
   round: string | null;
   eco: string | null;
   opening: string | null;
@@ -237,6 +239,7 @@ export default async function PlayerPage({ params, searchParams }: PlayerPagePro
             result: row.result,
             event: row.event,
             site: row.site,
+            timeControl: gameTimeControl(row.originalPgn),
             round: row.round,
             eco: row.eco,
             opening: row.opening,
@@ -386,10 +389,16 @@ export default async function PlayerPage({ params, searchParams }: PlayerPagePro
                           <dd>{selectedGame.event}</dd>
                         </div>
                       ) : null}
-                      {selectedGame.site ? (
+                      {selectedGame.site && !isUrlPlace(selectedGame.site) ? (
                         <div>
                           <dt>Place</dt>
                           <dd>{selectedGame.site}</dd>
+                        </div>
+                      ) : null}
+                      {selectedGame.timeControl ? (
+                        <div>
+                          <dt>Time control</dt>
+                          <dd>{selectedGame.timeControl}</dd>
                         </div>
                       ) : null}
                       {selectedGame.date ? (

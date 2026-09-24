@@ -175,6 +175,43 @@
   padding: 1rem;
 }
 
+.notation-scroll.has-annotations {
+  overflow-x: auto;
+}
+
+.notation-scroll.has-annotations .notation-line {
+  min-width: 24rem;
+}
+
+.notation-annotation-controls {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.notation-annotation-controls button {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.notation-annotation-controls button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: #e7efe8;
+  color: var(--accent-strong);
+}
+
+.notation-annotation-controls button:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
 .notation-line {
   display: grid;
   gap: 0.2rem;
@@ -200,6 +237,7 @@
   width: 100%;
   min-height: 2.45rem;
   align-items: center;
+  justify-content: space-between;
   gap: 0.3rem;
   padding: 0.35rem 0.5rem;
   border: 1px solid transparent;
@@ -209,6 +247,23 @@
   font: inherit;
   font-weight: 700;
   cursor: pointer;
+}
+
+.notation-annotations {
+  display: inline-flex;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.notation-move > span:first-child {
+  white-space: nowrap;
+}
+
+.notation-annotations small {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
 .notation-move:hover {

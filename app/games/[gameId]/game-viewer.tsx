@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Chessboard } from "react-chessboard";
 
+import { moveAnnotations } from "@/lib/games/annotations";
 import {
   endSelection,
   findReplayLine,
@@ -27,6 +28,8 @@ type NotationLineProps = {
   lineId: string;
   selected: ReplaySelection;
   onSelect: (selection: ReplaySelection) => void;
+  showClock: boolean;
+  showEvaluation: boolean;
 };
 
 function notationPrefix(moveNumber: number, side: "white" | "black") {
@@ -44,7 +47,7 @@ function isTypingTarget(target: EventTarget | null) {
   );
 }
 
-function NotationLine({ replay, lineId, selected, onSelect }: NotationLineProps) {
+function NotationLine({ replay, lineId, selected, onSelect, showClock, showEvaluation }: NotationLineProps) {
   const line = findReplayLine(replay, lineId);
   if (!line) return null;
 
@@ -58,12 +61,16 @@ function NotationLine({ replay, lineId, selected, onSelect }: NotationLineProps)
             lineId={line.id}
             onSelect={onSelect}
             selected={selected}
+            showClock={showClock}
+            showEvaluation={showEvaluation}
           />
           <NotationMoveCell
             entry={row.black}
             lineId={line.id}
             onSelect={onSelect}
             selected={selected}
+            showClock={showClock}
+            showEvaluation={showEvaluation}
           />
         </div>
       ))}
@@ -76,26 +83,44 @@ function NotationMoveCell({
   entry,
   selected,
   onSelect,
+  showClock,
+  showEvaluation,
 }: {
   lineId: string;
   entry: ReplayMoveEntry | null;
   selected: ReplaySelection;
   onSelect: (selection: ReplaySelection) => void;
+  showClock: boolean;
+  showEvaluation: boolean;
 }) {
   if (!entry) return <span aria-hidden="true" className="notation-cell notation-cell-empty" />;
   const { move, index } = entry;
   const isSelected = selected.lineId === lineId && selected.index === index;
+  const { clock, evaluation } = moveAnnotations(move.comment);
+  const visibleClock = showClock ? clock : null;
+  const visibleEvaluation = showEvaluation ? evaluation : null;
+  const moveLabel = [
+    `${notationPrefix(move.moveNumber, move.side)} ${move.san}`,
+    visibleClock ? `Time ${visibleClock}` : null,
+    visibleEvaluation ? `Evaluation ${visibleEvaluation}` : null,
+  ].filter(Boolean).join(", ");
 
   return (
     <div className="notation-cell">
       <button
         aria-current={isSelected ? "step" : undefined}
-        aria-label={`${notationPrefix(move.moveNumber, move.side)} ${move.san}`}
+        aria-label={moveLabel}
         className={`notation-move${isSelected ? " is-current" : ""}`}
         onClick={() => onSelect({ lineId, index })}
         type="button"
       >
-        {move.san}
+        <span>{move.san}</span>
+        {visibleClock || visibleEvaluation ? (
+          <span className="notation-annotations">
+            {visibleClock ? <small title="Clock remaining">{visibleClock}</small> : null}
+            {visibleEvaluation ? <small title="Evaluation for White">{visibleEvaluation}</small> : null}
+          </span>
+        ) : null}
       </button>
     </div>
   );
@@ -108,8 +133,20 @@ export function GameViewer({
 }: GameViewerProps) {
   const [selection, setSelection] = useState<ReplaySelection>(() => startSelection(replay));
   const [boardOrientation, setBoardOrientation] = useState<"white" | "black">(initialOrientation);
+  const [showClock, setShowClock] = useState(false);
+  const [showEvaluation, setShowEvaluation] = useState(false);
 
   const currentLine = findReplayLine(replay, selection.lineId);
+  const availableAnnotations = useMemo(() => {
+    const mainLine = findReplayLine(replay, replay.mainLineId);
+    return (mainLine?.moves ?? []).reduce(
+      (available, move) => {
+        const { clock, evaluation } = moveAnnotations(move.comment);
+        return { clock: available.clock || Boolean(clock), evaluation: available.evaluation || Boolean(evaluation) };
+      },
+      { clock: false, evaluation: false },
+    );
+  }, [replay]);
   const currentMove = selection.index >= 0 ? currentLine?.moves[selection.index] ?? null : null;
   const fen = selectionFen(replay, selection) ?? replay.initialFen;
   const previous = previousSelection(replay, selection);
@@ -270,12 +307,28 @@ export function GameViewer({
             <span className="muted">Click any move to jump</span>
           </div>
         ) : null}
-        <div className={`notation-scroll${compact ? " compact-notation-scroll" : ""}`}>
+        {availableAnnotations.clock || availableAnnotations.evaluation ? (
+          <div aria-label="Move annotations" className="notation-annotation-controls" role="group">
+            {availableAnnotations.clock ? (
+              <button aria-pressed={showClock} onClick={() => setShowClock((value) => !value)} type="button">
+                Time
+              </button>
+            ) : null}
+            {availableAnnotations.evaluation ? (
+              <button aria-pressed={showEvaluation} onClick={() => setShowEvaluation((value) => !value)} type="button">
+                Evaluations
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+        <div className={`notation-scroll${compact ? " compact-notation-scroll" : ""}${showClock || showEvaluation ? " has-annotations" : ""}`}>
           <NotationLine
             lineId={replay.mainLineId}
             onSelect={setSelection}
             replay={replay}
             selected={selection}
+            showClock={showClock}
+            showEvaluation={showEvaluation}
           />
         </div>
       </section>
