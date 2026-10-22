@@ -133,6 +133,10 @@ export async function POST(request: Request) {
     );
   }
 
+  if (focalFideId && focalCandidate.fideId && focalCandidate.fideId !== focalFideId) {
+    return errorResponse("The PGN focal player has a different FIDE ID from the requested opponent.", 409);
+  }
+
   try {
     const db = getDb();
     const [targetTournament] = await db
@@ -166,6 +170,7 @@ export async function POST(request: Request) {
         focalOpponent: {
           sourceName: focalCandidate.name,
           sourceFideId: focalCandidate.fideId,
+          canonicalFideId: focalFideId || null,
           canonicalName,
           tournamentId: targetTournament.id,
         },

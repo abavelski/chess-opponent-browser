@@ -1,15 +1,67 @@
-import { describe, expect, it } from "vitest";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { randomUUID } from "node:crypto";
+import { describe, expect, it, vi } from "vitest";
 
-import { assertSnapshotTarget, danbaseNameVariants, filterParticipantsByGroup, identityKeys, isProviderRatingStale, mergeParticipants, normalizeParticipantName, parseArguments, snapshotHash, toRating, workspacePaths } from "../scripts/sync-tournament.mjs";
+import { assertSnapshotTarget, danbaseNameVariants, filterParticipantsByGroup, identityKeys, isProviderRatingStale, main, mergeParticipants, normalizeParticipantName, parseArguments, snapshotHash, toRating, workspacePaths } from "../scripts/sync-tournament.mjs";
 
 describe("tournament sync CLI", () => {
+  it.each([false, true])("reconciles the authoritative snapshot after game imports (upload failure: %s)", async (failUpload) => {
+    const directory = await mkdtemp(join(tmpdir(), "sync-roster-"));
+    const nickname = `sync-test-${randomUUID()}`;
+    const snapshotPath = join(directory, "participants.json");
+    const inputPath = join(directory, "games.pgn");
+    const calls = [];
+    const counts = { total: 1, matched: 1, created: 0, added: 0, removed: 1, ratingChanges: 0 };
+    await writeFile(snapshotPath, JSON.stringify({ tournamentNickname: nickname, players: [{ name: "Peter Sørensen", fideId: "1447467" }] }));
+    await writeFile(inputPath, '[White "Different Archive Spelling"]\n[WhiteFideId "1447467"]\n[Black "Other Player"]\n[Result "1-0"]\n\n1. e4 e5 1-0\n');
+    vi.stubGlobal("fetch", vi.fn(async (url, request = {}) => {
+      const path = new URL(url).pathname;
+      calls.push(`${request.method ?? "GET"} ${path}`);
+      let payload;
+      if (path.endsWith("/config")) payload = { ok: true, tournament: { nickname, name: "Test tournament" } };
+      else if (path.endsWith("/sync-runs")) payload = { ok: true, run: { id: 1 } };
+      else if (path.endsWith("/import")) payload = {
+        ok: true, opponent: { rosterAdded: true, conflictCount: 0 },
+        import: { importedCount: 0, duplicateCount: 1, parseErrorCount: 0, persistenceErrorCount: 0 },
+      };
+      else if (path.endsWith("/sync")) {
+        expect(JSON.parse(request.body).players).toEqual([{ name: "Peter Sørensen", fideId: "1447467", dsuRatingUpdatedAt: null, fideRatingUpdatedAt: null }]);
+        payload = { ok: true, tournament: { name: "Test tournament" }, participants: counts };
+      } else throw new Error(`Unexpected request: ${path}`);
+      if (failUpload && path.endsWith("/import")) {
+        return new Response(JSON.stringify({ ok: false, message: "simulated upload failure" }), { status: 500 });
+      }
+      return new Response(JSON.stringify(payload), { headers: { "content-type": "application/json" } });
+    }));
+    try {
+      const run = main(["games", nickname, "--file", snapshotPath, "--danbase", inputPath, "--packs-dir", join(directory, "packs")]);
+      if (failUpload) await expect(run).rejects.toThrow("1 opponent game sync(s) failed.");
+      else expect((await run).stages.participantsFinal).toEqual(counts);
+      expect(calls).toEqual([
+        "GET /api/admin/tournaments/config",
+        "POST /api/admin/tournaments/sync-runs",
+        "POST /api/admin/opponents/import",
+        "POST /api/admin/tournaments/sync",
+        "PATCH /api/admin/tournaments/sync-runs",
+      ]);
+      const state = JSON.parse(await readFile(workspacePaths(nickname).syncStatePath, "utf8"));
+      expect(state.app.participants.total).toBe(1);
+    } finally {
+      vi.unstubAllGlobals();
+      await rm(directory, { recursive: true, force: true });
+      await rm(resolve("data", "tournaments", nickname), { recursive: true, force: true });
+    }
+  });
+
   it("defers local paths until the tournament workspace is known", () => {
     expect(parseArguments([])).toMatchObject({
       command: "all",
       includeRatings: false,
       snapshotPath: "",
       packsDir: "",
-      danbasePath: "C:/dev/danbase.pgn",
+      danbasePath: "data/danbase.pgn",
     });
   });
 
@@ -46,7 +98,7 @@ describe("tournament sync CLI", () => {
     expect(parseArguments(["all", "furesoe-open"])).toMatchObject({
       includeLichess: false,
       lichessMaxTournaments: 3,
-      lichessThrottleMs: 750,
+      lichessThrottleMs: 2500,
     });
     expect(parseArguments([
       "all",
@@ -100,6 +152,7 @@ describe("tournament sync CLI", () => {
     expect(toRating("1.934")).toBe(1934);
     expect(toRating("Not rated")).toBeNull();
     expect(identityKeys({ name: "  A   B ", dsuId: null, fideId: null })).toContain("name:a b");
+    expect(identityKeys({ name: "Player", dsuId: "-", fideId: "0" })).toEqual(["name:player"]);
   });
 
   it("generates Danbase surname-first variants and removes titles", () => {

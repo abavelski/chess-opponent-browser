@@ -19,10 +19,11 @@ import {
   fetchLichessFideBroadcasts,
 } from "../lib/local/sources/lichess.mjs";
 
-const DEFAULT_DANBASE = "C:/dev/danbase.pgn";
+const DEFAULT_DANBASE = "data/danbase.pgn";
 const DEFAULT_APP_URL = "https://chess-opponent-browser.vercel.app";
 const DEFAULT_TOURNAMENT_URL = "https://turnering.skak.dk/TournamentActive/Details?tourId=30508";
 const DEFAULT_RATING_TTL_DAYS = 30;
+const DEFAULT_LICHESS_THROTTLE_MS = 2500;
 const COMMANDS = new Set(["all", "participants", "dsu", "fide", "ratings", "app", "games", "lichess"]);
 
 export function toRating(value) {
@@ -41,9 +42,10 @@ export function normalizeParticipantName(value) {
 
 export function identityKeys(player) {
   const clean = (value) => String(value ?? "").normalize("NFKC").trim().toLowerCase();
+  const identifier = (kind, value) => /^\d+$/.test(clean(value)) && Number(value) > 0 ? `${kind}:${clean(value)}` : null;
   return [
-    player.dsuId ? `dsu:${clean(player.dsuId)}` : null,
-    player.fideId ? `fide:${clean(player.fideId)}` : null,
+    identifier("dsu", player.dsuId),
+    identifier("fide", player.fideId),
     player.dsuProfileUrl ? `dsu-url:${clean(player.dsuProfileUrl)}` : null,
     player.name ? `name:${clean(player.name).replace(/\s+/g, " ")}` : null,
   ].filter(Boolean);
@@ -125,7 +127,7 @@ export function parseArguments(argv) {
     ratingMode: "none",
     ratingTtlDays: DEFAULT_RATING_TTL_DAYS,
     includeLichess: false,
-    lichessThrottleMs: 750,
+    lichessThrottleMs: DEFAULT_LICHESS_THROTTLE_MS,
     lichessMaxTournaments: 3,
     dryRun: false,
     force: false,
@@ -512,6 +514,7 @@ export async function syncGames(options) {
           ...danbaseNameVariants(name),
           ...(Array.isArray(player.danbaseAliases) ? player.danbaseAliases : []),
         ],
+        fideIds: player.fideId ? [player.fideId] : [],
         outputPath: join(outputDirectory, packFilename(name)),
       };
     }),
@@ -542,7 +545,7 @@ export async function syncGames(options) {
         const uploaded = await uploadPack({
           baseUrl: options.appUrl,
           name,
-          aliases: danbaseNameVariants(name),
+          aliases: [...danbaseNameVariants(name), ...(Array.isArray(player.danbaseAliases) ? player.danbaseAliases : [])],
           fideId: player.fideId ?? "",
           packPath: pack.outputPath,
           tournamentNickname: options.nickname,
@@ -632,6 +635,7 @@ export async function syncLichessGames(options) {
   const tours = new Map();
   let metadataFailureCount = 0;
   const uniqueReferences = [...references.values()];
+  process.stdout.write(`Resolving ${uniqueReferences.length} unique Lichess broadcast round(s).\n`);
   for (const [index, reference] of uniqueReferences.entries()) {
     try {
       const tour = await fetchLichessBroadcastTour(reference, { token });
@@ -647,6 +651,7 @@ export async function syncLichessGames(options) {
   const sourcePgns = [];
   let downloadFailureCount = 0;
   const uniqueTours = [...tours.values()];
+  process.stdout.write(`Fetching ${uniqueTours.length} unique Lichess tournament PGN(s).\n`);
   for (const [index, tour] of uniqueTours.entries()) {
     const sourcePath = join(sourceDirectory, `${tour.id}.pgn`);
     const activityTimestamp = new Date(tour.lastActivityAt ?? "").valueOf();
@@ -770,7 +775,7 @@ export async function syncLichessGames(options) {
 }
 
 function usage() {
-  return `Synchronize a Danish tournament and its Danbase/Lichess games.\n\nUsage:\n  npm run sync-tournament -- <nickname>\n  npm run sync-tournament -- <nickname> --ratings\n  npm run sync-tournament -- <nickname> --ratings=stale\n  npm run sync-tournament -- <nickname> --lichess\n  npm run sync-tournament -- <nickname> --dry-run\n  npm run sync-participants -- <nickname>\n  npm run sync-ratings -- <nickname>\n  npm run sync-app -- <nickname>\n  npm run sync-games -- <nickname> --lichess\n  npm run sync-lichess -- <nickname>\n\nThe nickname loads that exact tournament even when it is inactive. Omit it to\nuse the active tournament. Rating updates and Lichess discovery are skipped by\nthe normal full sync unless explicitly requested. LICHESS_TOKEN is optional but\nrecommended if unauthenticated API requests become rate-limited.\n\nCommands: all, participants, dsu, fide, ratings, app, games, lichess\nOptions:\n  -f, --file <path>       Override the per-tournament local snapshot\n  -u, --url <url>         Override the saved tournament URL for this run\n      --ratings           Refresh every DSU and FIDE rating\n      --ratings=stale     Refresh only provider ratings older than the TTL\n      --rating-ttl-days   Stale rating age (default: ${DEFAULT_RATING_TTL_DAYS})\n      --danbase <path>    Danbase PGN (default: ${DEFAULT_DANBASE})\n      --lichess           Also discover and import recent Lichess broadcasts\n      --lichess-max-tournaments <n>  Recent tournaments per player (default: 3)\n      --lichess-throttle <ms>        Delay between Lichess requests (default: 750)\n      --app-url <url>     Target app (default: OPPONENT_BROWSER_URL or Production)\n      --packs-dir <path>  Override the per-tournament PGN packs folder\n      --dry-run           Plan app changes and extract packs without uploading\n      --force             Allow a large participant-roster removal\n      --throttle <ms>     Delay between rating pages (default: 2500)\n`;
+  return `Synchronize a Danish tournament and its Danbase/Lichess games.\n\nUsage:\n  npm run sync-tournament -- <nickname>\n  npm run sync-tournament -- <nickname> --ratings\n  npm run sync-tournament -- <nickname> --ratings=stale\n  npm run sync-tournament -- <nickname> --lichess\n  npm run sync-tournament -- <nickname> --dry-run\n  npm run sync-participants -- <nickname>\n  npm run sync-ratings -- <nickname>\n  npm run sync-app -- <nickname>\n  npm run sync-games -- <nickname> --lichess\n  npm run sync-lichess -- <nickname>\n\nThe nickname loads that exact tournament even when it is inactive. Omit it to\nuse the active tournament. Rating updates and Lichess discovery are skipped by\nthe normal full sync unless explicitly requested. LICHESS_TOKEN is optional but\nrecommended if unauthenticated API requests become rate-limited.\n\nCommands: all, participants, dsu, fide, ratings, app, games, lichess\nOptions:\n  -f, --file <path>       Override the per-tournament local snapshot\n  -u, --url <url>         Override the saved tournament URL for this run\n      --ratings           Refresh every DSU and FIDE rating\n      --ratings=stale     Refresh only provider ratings older than the TTL\n      --rating-ttl-days   Stale rating age (default: ${DEFAULT_RATING_TTL_DAYS})\n      --danbase <path>    Danbase PGN (default: ${DEFAULT_DANBASE})\n      --lichess           Also discover and import recent Lichess broadcasts\n      --lichess-max-tournaments <n>  Recent tournaments per player (default: 3)\n      --lichess-throttle <ms>        Delay between Lichess requests (default: ${DEFAULT_LICHESS_THROTTLE_MS})\n      --app-url <url>     Target app (default: OPPONENT_BROWSER_URL or Production)\n      --packs-dir <path>  Override the per-tournament PGN packs folder\n      --dry-run           Plan app changes and extract packs without uploading\n      --force             Allow a large participant-roster removal\n      --throttle <ms>     Delay between rating pages (default: 2500)\n`;
 }
 
 export async function main(argv = process.argv.slice(2)) {
@@ -779,6 +784,7 @@ export async function main(argv = process.argv.slice(2)) {
   const options = await configureWorkspace(parsedOptions);
   const run = options.dryRun ? null : await startSyncRun(options);
   const summary = { stages: {} };
+  let needsRosterReconciliation = false;
   try {
     if (options.command === "participants") {
       const snapshot = await refreshParticipants(options);
@@ -792,17 +798,27 @@ export async function main(argv = process.argv.slice(2)) {
     } else if (options.command === "app") {
       summary.stages.participants = (await syncApp(options)).participants;
     } else if (options.command === "games") {
+      needsRosterReconciliation = true;
       summary.stages.games = await syncGames(options);
       if (options.includeLichess) summary.stages.lichess = await syncLichessGames(options);
     } else if (options.command === "lichess") {
+      needsRosterReconciliation = true;
       summary.stages.lichess = await syncLichessGames(options);
     } else {
       const snapshot = await refreshParticipants(options);
       summary.stages.participantsFetch = { count: snapshot.players.length };
       if (options.includeRatings) summary.stages.ratings = await refreshRatings(options, ["dsu", "fide"]);
       summary.stages.participants = (await syncApp(options)).participants;
+      needsRosterReconciliation = true;
       summary.stages.games = await syncGames(options);
       if (options.includeLichess) summary.stages.lichess = await syncLichessGames(options);
+    }
+
+    if (["all", "games", "lichess"].includes(options.command)) {
+      // Imports can attach an existing namesake to the roster. The source
+      // participant list remains authoritative after all game imports finish.
+      summary.stages.participantsFinal = (await syncApp(options)).participants;
+      needsRosterReconciliation = false;
     }
 
     const ratingFailures = summary.stages.ratings?.failed ?? 0;
@@ -827,6 +843,13 @@ export async function main(argv = process.argv.slice(2)) {
     }
     return summary;
   } catch (error) {
+    if (needsRosterReconciliation) {
+      await syncApp(options).then((result) => {
+        summary.stages.participantsFinal = result.participants;
+      }).catch((reconciliationError) => {
+        process.stderr.write(`Final roster reconciliation failed: ${reconciliationError instanceof Error ? reconciliationError.message : String(reconciliationError)}\n`);
+      });
+    }
     if (run) {
       await finishSyncRun(
         options,

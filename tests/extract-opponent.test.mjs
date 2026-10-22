@@ -151,6 +151,13 @@ describe("local opponent PGN extraction", () => {
     expect(await readFile(outputPath, "utf8")).toContain('[White "Tursic, Benjamin"]');
   });
 
+  it("excludes a namesake whose FIDE ID contradicts the requested player", () => {
+    const names = new Set(playerNameVariants("Peter Sørensen"));
+    expect(gameMatchesTarget({ white: "Sorensen, Peter", whitefideid: "1470914" }, names, new Set(["1447467"]))).toBe(false);
+    expect(gameMatchesTarget({ white: "Sorensen, Peter", whitefideid: "1447467" }, names, new Set(["1447467"]))).toBe(true);
+    expect(gameMatchesTarget({ white: "Sorensen, Peter" }, names, new Set(["1447467"]))).toBe(true);
+  });
+
   it("extracts separate opponent packs in one Danbase scan", async () => {
     const { inputPath, outputPath } = await tempFiles();
     const secondOutput = outputPath.replace("opponent.pgn", "second.pgn");

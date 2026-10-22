@@ -105,7 +105,7 @@ npm run sync-games -- <tournament-nickname> --lichess
 The default is the three most recent broadcasts per player. Override it with
 `--lichess-max-tournaments <1-10>`. Re-run the command to fetch newer broadcast
 snapshots and import newly completed games. `LICHESS_TOKEN` is optional; set it if
-Lichess begins rate-limiting unauthenticated requests.
+Lichess begins rate-limiting unauthenticated requests. For reliable bulk synchronization, use a token with the `study:read` scope, as described in the [official Lichess API documentation](https://lichess-org.github.io/api/).
 
 Local files are kept under:
 

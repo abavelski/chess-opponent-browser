@@ -218,6 +218,35 @@ describe("PGN import persistence", () => {
     });
   });
 
+  it("uses the requested FIDE identity before an unrelated source-name alias", async () => {
+    const { repository, participants } = fakeRepository([
+      { id: 5, name: "Prepared Opponent", fideId: "1447467" },
+      { id: 6, name: "Completely Unknown", fideId: "1470914" },
+    ]);
+    const result = await persistParsedImport({
+      filename: "namesake.pgn", sourceLabel: "Danbase", preview: parsePgnPreview(unknownPgn),
+      focalOpponent: {
+        sourceName: "Completely Unknown", sourceFideId: null,
+        canonicalName: "Prepared Opponent", canonicalFideId: "1447467", tournamentId: 12,
+      },
+    }, repository);
+    expect(result.focalOpponent?.playerId).toBe(5);
+    expect(participants.has("12:6")).toBe(false);
+    expect(participants.has("12:5")).toBe(true);
+  });
+
+  it("rejects conflicting focal FIDE identities before adding a participant", async () => {
+    const { repository, participants } = fakeRepository([]);
+    await expect(persistParsedImport({
+      filename: "namesake.pgn", sourceLabel: "Danbase", preview: parsePgnPreview(unknownPgn),
+      focalOpponent: {
+        sourceName: "Completely Unknown", sourceFideId: "1470914",
+        canonicalName: "Prepared Opponent", canonicalFideId: "1447467", tournamentId: 12,
+      },
+    }, repository)).rejects.toThrow("contradicts the requested FIDE identity");
+    expect(participants.size).toBe(0);
+  });
+
   it("reports a duplicate focal-side conflict without overwriting the existing Player link", async () => {
     const preview = parsePgnPreview(unknownPgn);
     const { repository } = fakeRepository(

@@ -119,6 +119,8 @@ npm run sync-tournament -- furesoe-open-2026 --ratings=stale
 
 Override the freshness window with `--rating-ttl-days <days>`. Successful DSU and FIDE fetches are timestamped independently. A failed provider request preserves the last known rating and remains stale for retry.
 
+An empty FIDE profile is retried once with a fresh URL to bypass cached empty responses. Lichess requests retry HTTP 429 twice, respecting `Retry-After` and waiting at least 60 seconds before the first retry and 120 seconds before the second. Increase `--lichess-throttle` when syncing a large roster.
+
 Preview participant changes and game packs without changing the hosted database. The refreshed snapshot, extracted packs, and `sync-state.json` remain in the local tournament workspace:
 
 ```bash
@@ -126,6 +128,8 @@ npm run sync-tournament -- furesoe-open-2026 --dry-run
 ```
 
 Roster removals above 25% are rejected unless the reviewed run is repeated with `--force`.
+
+Unattributed bye/oversidder rows without player IDs, profiles, or ratings are ignored. A `-` placeholder is never treated as a DSU identity.
 
 Individual stages are also available:
 
@@ -146,7 +150,13 @@ small player packs to the app. Historical downloads are reused; recent broadcast
 refetched so reruns pick up newly streamed games. See `docs/add-opponents.md` for limits
 and options.
 
-The nickname fetches that exact tournament's URL and optional participant group from the app, whether or not it is active. Omit the nickname to use the active tournament. A group-filtered sync reconciles only the selected roster while preserving global players and games. Defaults are `C:\dev\danbase.pgn`, per-tournament snapshot/pack paths, and the Production app URL. Override them with `--url`, `--danbase`, `--file`, `--packs-dir`, and `--app-url`. The browser's active tournament is never changed by CLI synchronization.
+For reliable bulk Lichess synchronization, set `LICHESS_TOKEN` with the `study:read` scope. Public tournament API requests are heavily rate limited.
+
+The nickname fetches that exact tournament's URL and optional participant group from the app, whether or not it is active. Omit the nickname to use the active tournament. A group-filtered sync reconciles only the selected roster while preserving global players and games. Defaults are `data/danbase.pgn`, per-tournament snapshot/pack paths, and the Production app URL. Override them with `--url`, `--danbase`, `--file`, `--packs-dir`, and `--app-url`. The browser's active tournament is never changed by CLI synchronization.
+
+Full syncs and standalone game syncs reconcile the roster again after imports, because a historical PGN name can resolve to a different canonical player and add that player to the roster. The saved participant snapshot remains authoritative; removing an extra roster entry preserves its global player and games. Review ambiguous identities in Admin before merging them.
+
+Danbase extraction also uses each participant's FIDE ID, rejects name matches with a different explicit FIDE ID, and passes local aliases to the importer. The import API rejects a conflicting focal FIDE ID and prefers the requested FIDE identity over a source-name alias.
 
 Each non-dry-run CLI operation creates one high-level sync record. Recent runs and failures are visible on `/admin`; low-level PGN imports remain in Import history. Provider parsers and representative malformed PGNs are covered by saved fixtures under `tests/fixtures/`.
 

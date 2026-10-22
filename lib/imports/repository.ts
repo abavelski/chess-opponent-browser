@@ -35,10 +35,26 @@ function storableFideId(value: string | null) {
 }
 
 async function saveGameUnit(input: SaveImportedGameUnit): Promise<SaveImportedGameResult> {
+  try {
+    return await saveGameUnitWithTarget(input, Boolean(input.moveFingerprint));
+  } catch (error) {
+    const databaseError = error instanceof Error && "cause" in error ? error.cause : error;
+    if (input.moveFingerprint && input.fingerprint && databaseError
+      && typeof databaseError === "object" && "code" in databaseError && databaseError.code === "23505"
+      && "constraint" in databaseError && databaseError.constraint === "games_duplicate_fingerprint_unique") {
+      // A formerly unresolved game may already have its content fingerprint,
+      // but gain a move fingerprint now that both players are known.
+      return saveGameUnitWithTarget(input, false);
+    }
+    throw error;
+  }
+}
+
+async function saveGameUnitWithTarget(input: SaveImportedGameUnit, matchMoves: boolean): Promise<SaveImportedGameResult> {
   const db = getDb();
   const movesJson = JSON.stringify(input.game.structuredMoves);
   const tagsJson = JSON.stringify(input.game.tags);
-  const conflictTarget = input.moveFingerprint
+  const conflictTarget = matchMoves
     ? sql`("move_fingerprint")`
     : sql`("duplicate_fingerprint")`;
 

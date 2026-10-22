@@ -1,9 +1,10 @@
 import { readFile } from "node:fs/promises";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   fetchLichessBroadcastPgn,
+  fetchLichessBroadcastRoundPgn,
   fetchLichessBroadcastTour,
   fetchLichessFideBroadcasts,
   parseLichessFideBroadcastsHtml,
@@ -12,6 +13,45 @@ import {
 const fixture = new URL("./fixtures/lichess-fide-player.html", import.meta.url);
 
 describe("Lichess broadcast source adapter", () => {
+  it("can export an individual round when a full tournament export is unavailable", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(new Response('[Event "Round export"]\n\n1. e4 e5 *'));
+    expect(await fetchLichessBroadcastRoundPgn("Round123", { fetchImpl })).toContain("Round export");
+    expect(fetchImpl.mock.calls[0][0]).toBe("https://lichess.org/api/broadcast/round/Round123.pgn");
+  });
+
+  it("retries a PGN export whose response stream terminates early", async () => {
+    vi.useFakeTimers();
+    try {
+      const brokenBody = new ReadableStream({ start(controller) { controller.error(new TypeError("terminated")); } });
+      const fetchImpl = vi.fn()
+        .mockResolvedValueOnce(new Response(brokenBody))
+        .mockResolvedValueOnce(new Response('[Event "Recovered stream"]\n\n1. e4 e5 *'));
+      const request = fetchLichessBroadcastPgn("Tour1234", { fetchImpl });
+      await vi.advanceTimersByTimeAsync(2500);
+      expect(await request).toContain("Recovered stream");
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("honors Retry-After before retrying a rate-limited request", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchImpl = vi.fn()
+        .mockResolvedValueOnce(new Response("", { status: 429, headers: { "retry-after": "120" } }))
+        .mockResolvedValueOnce(new Response('[Event "Recovered"]\n\n1. e4 e5 *'));
+      const request = fetchLichessBroadcastPgn("Tour1234", { fetchImpl });
+      await vi.advanceTimersByTimeAsync(119_999);
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await request).toContain("Recovered");
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("parses recent broadcasts from a FIDE player page", async () => {
     const html = await readFile(fixture, "utf8");
     expect(parseLichessFideBroadcastsHtml(html)).toEqual([

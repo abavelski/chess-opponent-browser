@@ -54,6 +54,7 @@ export type ImportStatus = "processing" | "completed" | "completed_with_errors" 
 export type FocalOpponentInput = {
   sourceName: string;
   sourceFideId: string | null;
+  canonicalFideId?: string | null;
   canonicalName: string;
   tournamentId: number;
 };
@@ -240,6 +241,11 @@ export async function persistParsedImport(
   let focalSourceKey = "";
 
   if (input.focalOpponent) {
+    const canonicalFideId = usableFideId(input.focalOpponent.canonicalFideId ?? null);
+    if (canonicalFideId && usableFideId(input.focalOpponent.sourceFideId)
+      && canonicalFideId !== usableFideId(input.focalOpponent.sourceFideId)) {
+      throw new Error("The PGN focal player contradicts the requested FIDE identity.");
+    }
     focalSourceKey = normalizeImportedPlayerName(input.focalOpponent.sourceName);
     const existingResolution = resolveImportedSide(
       {
@@ -249,11 +255,11 @@ export async function persistParsedImport(
       identities,
     );
 
-    const canonicalResolution = existingResolution.playerId === null
+    const canonicalResolution = canonicalFideId !== null || existingResolution.playerId === null
       ? resolveImportedSide(
           {
             name: input.focalOpponent.canonicalName,
-            fideId: input.focalOpponent.sourceFideId,
+            fideId: canonicalFideId ?? input.focalOpponent.sourceFideId,
           },
           identities,
         )
@@ -266,7 +272,7 @@ export async function persistParsedImport(
     if (!focalPlayer) {
       focalPlayer = await repository.createCanonicalPlayer({
         name: input.focalOpponent.canonicalName,
-        fideId: usableFideId(input.focalOpponent.sourceFideId),
+        fideId: canonicalFideId ?? usableFideId(input.focalOpponent.sourceFideId),
       });
       focalPlayerCreated = true;
       players.push(focalPlayer);

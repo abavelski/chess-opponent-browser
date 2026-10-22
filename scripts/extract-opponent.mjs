@@ -93,7 +93,11 @@ export function gameMatchesTarget(tags, normalizedNames, fideIds = new Set()) {
   const whiteFideId = String(tags.whitefideid ?? "").trim();
   const blackFideId = String(tags.blackfideid ?? "").trim();
   if (fideIds.has(whiteFideId) || fideIds.has(blackFideId)) return true;
-  return gameMatchesPlayer(tags, normalizedNames);
+  return ["white", "black"].some((side) => {
+    const sourceId = String(tags[`${side}fideid`] ?? "").trim();
+    if (fideIds.size && /^\d{4,12}$/.test(sourceId) && !fideIds.has(sourceId)) return false;
+    return playerNameVariants(tags[side], false).some((name) => normalizedNames.has(name));
+  });
 }
 
 function parseTagLine(line) {
