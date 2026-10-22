@@ -64,8 +64,9 @@ describe("Lichess PGN viewer integration", () => {
 
   it("constrains resizing to leave notation space alongside the board", () => {
     expect(constrainedBoardSize(500, 1200)).toBe(500);
-    expect(constrainedBoardSize(900, 1200)).toBe(640);
-    expect(constrainedBoardSize(600, 800)).toBe(464);
+    expect(constrainedBoardSize(900, 1200)).toBe(864);
+    expect(constrainedBoardSize(600, 800)).toBe(560);
+    expect(constrainedBoardSize(1800, 1800)).toBe(1024);
     expect(constrainedBoardSize(120, 900)).toBe(220);
     expect(constrainedBoardSize(900, 350)).toBe(350);
   });
@@ -78,6 +79,10 @@ describe("Lichess PGN viewer integration", () => {
       expect(markup).toContain('class="lichess-viewer-host"');
       expect(markup).toContain("Chess game replay");
       expect(markup).toContain("replay-board-resize-handle");
+      expect(markup).toContain(compact ? "768px" : "896px");
+      expect(markup).toContain('role="switch"');
+      expect(markup).toContain('aria-checked="false"');
+      expect(markup).toContain('aria-label="Stockfish settings"');
       expect(markup).toContain("replay-notation-controls");
       expect(markup).toContain("Go to beginning of game");
       expect(markup).toContain("Previous move");

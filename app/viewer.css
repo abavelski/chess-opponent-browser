@@ -176,20 +176,49 @@
 }
 
 .replay-engine-toggle {
-  min-width: 2.3rem;
-  height: 2rem;
+  display: block;
+  width: 2.9rem;
+  height: 1.85rem;
+  padding: 0;
   border: 0;
-  border-radius: 0.8rem;
-  background: #d4d8d3;
-  color: #6d736d;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: #777d75;
   cursor: pointer;
-  font-size: 1.15rem;
-  font-weight: 700;
 }
 
-.replay-engine-toggle.is-on {
-  background: #739c1c;
-  color: white;
+.replay-engine-toggle-track {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  padding: 0.18rem;
+  border-radius: 0.6rem;
+  background: #c9cec7;
+  transition: background 150ms ease;
+}
+
+.replay-engine-toggle.is-on .replay-engine-toggle-track {
+  background: #629b13;
+}
+
+.replay-engine-toggle-thumb {
+  display: grid;
+  width: 1.45rem;
+  height: 1.45rem;
+  place-items: center;
+  border-radius: 0.38rem;
+  background: #f8faf7;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 20%);
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1;
+  transition: transform 150ms ease;
+}
+
+.replay-engine-toggle.is-on .replay-engine-toggle-thumb {
+  color: #629b13;
+  transform: translateX(1.05rem);
 }
 
 .replay-engine-score {
@@ -222,6 +251,12 @@
 .replay-engine-caption small {
   color: var(--muted);
   font-size: 0.72rem;
+}
+
+.replay-engine-settings-anchor {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .replay-engine-settings-button {
@@ -334,20 +369,20 @@
   pointer-events: none;
 }
 
-/* Keep the grip in the gutter, outside the playable h1 square. */
+/* Lichess-style tiny diagonal grip inside the h1 square. */
 .replay-board-resize-handle {
   position: absolute;
-  right: -0.8rem;
-  bottom: -0.8rem;
+  right: 1px;
+  bottom: 1px;
   display: grid;
-  width: 0.8rem;
-  height: 0.8rem;
+  width: 13px;
+  height: 13px;
   place-items: center;
   padding: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: var(--muted);
+  color: #3c372f;
   cursor: nwse-resize;
   pointer-events: auto;
   touch-action: none;
@@ -451,11 +486,10 @@
     width: var(--replay-board-size);
   }
 
-  /* In stacked mode the board may span the full viewport width, so keep the
-     tiny grip below it rather than protruding outside the viewport. */
+  /* Keep the resize grip within the board at narrow widths too. */
   .replay-board-resize-handle {
-    right: 0;
-    bottom: -0.75rem;
+    right: 1px;
+    bottom: 1px;
   }
 
   .replay-engine-pane {

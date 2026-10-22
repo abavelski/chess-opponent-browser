@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import LichessPgnViewer from "@lichess-org/pgn-viewer";
 import { makeGame } from "@lichess-org/pgn-viewer/pgn";
+import type { DrawShape } from "@lichess-org/chessground/draw";
+import type { EngineLine } from "@/lib/games/browser-stockfish";
+import { ENGINE_ARROW_BRUSH, engineArrowShapes } from "@/lib/games/engine-arrows";
 
 import { LichessFlipIcon } from "./lichess-flip-icon";
 import { StockfishAnalysis } from "./stockfish-analysis";
@@ -19,7 +22,7 @@ type Navigation = { first: boolean; prev: boolean; next: boolean; last: boolean 
 type ResizeStart = { pointerId: number; x: number; y: number; size: number };
 
 const minimumBoardSize = 220;
-const maximumBoardSize = 640;
+const maximumBoardSize = 1024;
 const stackedBreakpoint = 672;
 
 export function constrainedBoardSize(requested: number, availableWidth: number) {
@@ -29,7 +32,7 @@ export function constrainedBoardSize(requested: number, availableWidth: number) 
     Math.min(minimumBoardSize, availableWidth),
     Math.min(
       maximumBoardSize,
-      stacked ? availableWidth : Math.min(Math.round(availableWidth * 0.58), availableWidth - 240),
+      stacked ? availableWidth : Math.min(Math.round(availableWidth * 0.72), availableWidth - 240),
     ),
   );
   return Math.max(Math.min(minimumBoardSize, max), Math.min(max, requested));
@@ -125,10 +128,11 @@ export function GameViewer({
   const workspaceRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<Viewer | null>(null);
   const dragRef = useRef<ResizeStart | null>(null);
-  const [boardSize, setBoardSize] = useState(compact ? 384 : 448);
+  const [boardSize, setBoardSize] = useState(compact ? 768 : 896);
   const [availableWidth, setAvailableWidth] = useState(0);
   const [navigation, setNavigation] = useState<Navigation>(initialNavigation);
   const [analysisFen, setAnalysisFen] = useState(() => makeGame(pgn).initial.fen);
+  const [engineLines, setEngineLines] = useState<{ fen: string; lines: EngineLine[] }>({ fen: "", lines: [] });
   const actualBoardSize = constrainedBoardSize(boardSize, availableWidth);
   const isStacked = availableWidth > 0 && availableWidth <= stackedBreakpoint;
 
@@ -140,6 +144,10 @@ export function GameViewer({
     });
     observer.observe(workspace);
     return () => observer.disconnect();
+  }, []);
+
+  const handleEngineLines = useCallback((fen: string, lines: EngineLine[]) => {
+    setEngineLines({ fen, lines });
   }, []);
 
   useEffect(() => {
@@ -156,6 +164,17 @@ export function GameViewer({
       host.appendChild(mount);
       viewer = LichessPgnViewer(mount, gameViewerOptions(pgn, initialOrientation));
       viewerRef.current = viewer;
+      const brushes = viewer.ground?.state.drawable.brushes;
+      if (brushes) {
+        viewer.ground?.set({
+          drawable: {
+            brushes: {
+              ...brushes,
+              [ENGINE_ARROW_BRUSH]: { key: ENGINE_ARROW_BRUSH, color: "#777777", opacity: 0.52, lineWidth: 8 },
+            },
+          },
+        });
+      }
       const mountedViewer = viewer;
       const originalToPath = viewer.toPath;
       viewer.toPath = (path, focus) => {
@@ -179,6 +198,21 @@ export function GameViewer({
       host.replaceChildren();
     };
   }, [pgn, initialOrientation]);
+
+  // LPV restores its annotation shapes when the selected move changes.
+  // Add engine PV arrows separately, preserving those shapes and any user drawings.
+  useEffect(() => {
+    const ground = viewerRef.current?.ground;
+    if (!ground) return;
+    const annotations: DrawShape[] = ground.state.drawable.autoShapes.filter(
+      (shape) => shape.brush !== ENGINE_ARROW_BRUSH,
+    );
+    const current = viewerRef.current?.curData().fen;
+    const arrows = current === analysisFen && engineLines.fen === analysisFen
+      ? engineArrowShapes(engineLines.lines)
+      : [];
+    ground.setAutoShapes([...annotations, ...arrows]);
+  }, [analysisFen, engineLines]);
 
   function navigate(action: Shortcut) {
     const viewer = viewerRef.current;
@@ -246,7 +280,7 @@ export function GameViewer({
     >
       <div className="replay-workspace" ref={workspaceRef}>
         <div className="lichess-viewer-host" ref={hostRef} />
-        <StockfishAnalysis fen={analysisFen} />
+        <StockfishAnalysis fen={analysisFen} onLinesChange={handleEngineLines} />
         <div className="replay-board-resize-region">
           <button
             aria-label="Resize chessboard"
