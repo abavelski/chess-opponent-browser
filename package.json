@@ -23,17 +23,22 @@
     "sync-fide": "node scripts/sync-tournament.mjs fide",
     "sync-app": "node scripts/sync-tournament.mjs app",
     "sync-games": "node scripts/sync-tournament.mjs games",
-    "sync-lichess": "node scripts/sync-tournament.mjs lichess"
+    "sync-lichess": "node scripts/sync-tournament.mjs lichess",
+    "engine:assets": "node scripts/copy-stockfish-assets.mjs",
+    "prebuild": "npm run engine:assets",
+    "predev": "npm run engine:assets"
   },
   "dependencies": {
     "@lichess-org/pgn-viewer": "2.7.3",
     "@neondatabase/serverless": "1.1.0",
+    "chessops": "0.15.1",
     "drizzle-orm": "0.45.2",
     "next": "16.3.5",
     "puppeteer": "^24.43.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "server-only": "0.0.1"
+    "server-only": "0.0.1",
+    "stockfish": "19.0.1"
   },
   "devDependencies": {
     "@next/env": "16.3.5",

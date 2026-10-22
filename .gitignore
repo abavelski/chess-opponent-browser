@@ -39,3 +39,6 @@ next-env.d.ts
 # local tournament snapshots
 /data/*
 !/data/.gitkeep
+
+# Generated browser Stockfish assets (copied from pinned npm dependency)
+/public/stockfish/

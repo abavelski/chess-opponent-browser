@@ -16,6 +16,24 @@ Chess Opponent Browser is a web application for tournament preparation and brows
 
 Game replay uses [Lichess PGN Viewer](https://github.com/lichess-org/pgn-viewer) (GPL-3.0-or-later). Its CSS and SVG chess pieces are bundled locally from the npm package.
 
+## Local Stockfish analysis
+
+Game review offers optional, entirely browser-side Stockfish 19 Lite evaluation. It uses
+[Stockfish.js](https://github.com/nmrugg/stockfish.js) (GPL-3.0) and
+[chessops](https://github.com/niklasf/chessops) for SAN variation previews.
+Click the evaluation switch above the notation to enable a single-threaded WebAssembly
+worker; use the gear to adjust depth (12–24), number of principal variations (1–3),
+or hash memory (16–64 MB). The worker shuts down when analysis is turned off or
+the game viewer unmounts, and restarts when settings change. Moving through the PGN
+stops the prior search before analyzing the selected position. Scores are from
+White's perspective, with mate scores shown as #+N / #-N.
+
+`npm run engine:assets` copies the engine JavaScript, WebAssembly and GPL license
+from the pinned npm package into `public/stockfish/`. This is run automatically
+before development and production builds; it does not require a third-party CDN,
+shared-memory isolation headers, a server engine, or a database migration. The
+Lite model is intentionally smaller and weaker than Stockfish's full-size network.
+
 ## Requirements
 
 - Node.js 24 LTS

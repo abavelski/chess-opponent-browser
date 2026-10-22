@@ -134,6 +134,175 @@
 
 .lichess-game-viewer .lpv__side {
   overflow: hidden;
+  padding-top: 3.4rem;
+}
+
+/* The Stockfish toolbar is independent of Lichess's virtual-DOM notation.
+   Reserve room in the score panel for engine analysis without covering moves. */
+.lichess-game-viewer:has(.replay-engine-pane[data-enabled="true"][data-lines="1"]) .lpv__side {
+  padding-top: 5.3rem;
+}
+.lichess-game-viewer:has(.replay-engine-pane[data-enabled="true"][data-lines="2"]) .lpv__side {
+  padding-top: 7.1rem;
+}
+.lichess-game-viewer:has(.replay-engine-pane[data-enabled="true"][data-lines="3"]) .lpv__side {
+  padding-top: 8.9rem;
+}
+
+.replay-engine-pane {
+  position: relative;
+  z-index: 5;
+  grid-column: 2;
+  grid-row: 1;
+  align-self: start;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-bottom-color: var(--border);
+  border-radius: 0.65rem 0.65rem 0 0;
+  background: #f6f7f3;
+}
+
+.replay-engine-pane[data-enabled="true"] {
+  border-top: 3px solid var(--accent);
+}
+
+.replay-engine-toolbar {
+  display: grid;
+  grid-template-columns: 2.7rem minmax(2.8rem, auto) minmax(0, 1fr) 2.6rem;
+  align-items: center;
+  min-height: 3.25rem;
+  gap: 0.3rem;
+  padding: 0.25rem 0.55rem;
+}
+
+.replay-engine-toggle {
+  min-width: 2.3rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 0.8rem;
+  background: #d4d8d3;
+  color: #6d736d;
+  cursor: pointer;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.replay-engine-toggle.is-on {
+  background: #739c1c;
+  color: white;
+}
+
+.replay-engine-score {
+  min-width: 3rem;
+  color: var(--text);
+  font-size: clamp(1.05rem, 2vw, 1.35rem);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.replay-engine-caption {
+  display: grid;
+  min-width: 0;
+  gap: 0.1rem;
+}
+
+.replay-engine-caption strong,
+.replay-engine-caption small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.replay-engine-caption strong {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.replay-engine-caption small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.replay-engine-settings-button {
+  display: grid;
+  width: 2.3rem;
+  height: 2.3rem;
+  place-items: center;
+  border: 0;
+  border-radius: 0.4rem;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.replay-engine-settings-button:hover,
+.replay-engine-toggle:hover {
+  filter: brightness(0.94);
+}
+
+.replay-engine-line {
+  display: grid;
+  grid-template-columns: 4rem minmax(0, 1fr);
+  min-width: 0;
+  height: 1.8rem;
+  align-items: center;
+  padding: 0 0.6rem;
+  border-top: 1px solid var(--border);
+  background: white;
+  font-size: 0.83rem;
+}
+
+.replay-engine-line strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.replay-engine-line span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.replay-engine-settings {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  right: 0;
+  z-index: 10;
+  display: grid;
+  width: min(19rem, 95vw);
+  gap: 0.45rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  background: white;
+  box-shadow: 0 0.5rem 1.5rem rgb(23 32 24 / 17%);
+}
+
+.replay-engine-settings label {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.replay-engine-settings select {
+  min-height: 2.1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: white;
+  padding: 0.3rem 0.5rem;
+}
+
+.replay-engine-settings p {
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+  font-size: 0.77rem;
+}
+
+.replay-engine-toggle:focus-visible,
+.replay-engine-settings-button:focus-visible,
+.replay-engine-settings select:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .lichess-game-viewer .lpv__moves {
@@ -287,6 +456,11 @@
   .replay-board-resize-handle {
     right: 0;
     bottom: -0.75rem;
+  }
+
+  .replay-engine-pane {
+    grid-column: 1;
+    grid-row: 2;
   }
 
   .replay-notation-controls {

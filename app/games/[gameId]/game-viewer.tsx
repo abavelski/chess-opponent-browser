@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import LichessPgnViewer from "@lichess-org/pgn-viewer";
+import { makeGame } from "@lichess-org/pgn-viewer/pgn";
 
 import { LichessFlipIcon } from "./lichess-flip-icon";
+import { StockfishAnalysis } from "./stockfish-analysis";
 
 type GameViewerProps = {
   pgn: string;
@@ -126,6 +128,7 @@ export function GameViewer({
   const [boardSize, setBoardSize] = useState(compact ? 384 : 448);
   const [availableWidth, setAvailableWidth] = useState(0);
   const [navigation, setNavigation] = useState<Navigation>(initialNavigation);
+  const [analysisFen, setAnalysisFen] = useState(() => makeGame(pgn).initial.fen);
   const actualBoardSize = constrainedBoardSize(boardSize, availableWidth);
   const isStacked = availableWidth > 0 && availableWidth <= stackedBreakpoint;
 
@@ -158,6 +161,7 @@ export function GameViewer({
       viewer.toPath = (path, focus) => {
         originalToPath(path, focus);
         setNavigation(navigationState(mountedViewer));
+        setAnalysisFen(mountedViewer.curData().fen);
       };
     } catch (cause) {
       host.replaceChildren();
@@ -242,6 +246,7 @@ export function GameViewer({
     >
       <div className="replay-workspace" ref={workspaceRef}>
         <div className="lichess-viewer-host" ref={hostRef} />
+        <StockfishAnalysis fen={analysisFen} />
         <div className="replay-board-resize-region">
           <button
             aria-label="Resize chessboard"
