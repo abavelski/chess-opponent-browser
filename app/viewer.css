@@ -122,8 +122,14 @@
   box-shadow: 0 0.25rem 1rem rgb(23 32 24 / 6%);
 }
 
+/* Chessground is square by construction. A border/radius on this grid item
+   reduces its content box and exposes white slivers along the last rank/file. */
 .lichess-game-viewer .lpv__board {
   overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .lichess-game-viewer .lpv__side {
@@ -159,18 +165,19 @@
   pointer-events: none;
 }
 
+/* Keep the grip in the gutter, outside the playable h1 square. */
 .replay-board-resize-handle {
   position: absolute;
-  right: 0;
-  bottom: 0;
+  right: -0.8rem;
+  bottom: -0.8rem;
   display: grid;
-  width: 2rem;
-  height: 2rem;
-  place-items: end;
-  padding: 0.15rem;
-  border: 1px solid var(--border);
-  border-radius: 0.45rem 0 0.45rem 0;
-  background: rgb(255 255 255 / 92%);
+  width: 0.8rem;
+  height: 0.8rem;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--muted);
   cursor: nwse-resize;
   pointer-events: auto;
@@ -178,9 +185,13 @@
   user-select: none;
 }
 
+.replay-board-resize-handle svg {
+  width: 11px;
+  height: 11px;
+}
+
 .replay-board-resize-handle:hover {
   color: var(--accent);
-  background: var(--surface-muted);
 }
 
 .replay-board-resize-handle:focus-visible,
@@ -269,6 +280,13 @@
   .replay-board-resize-region {
     justify-self: center;
     width: var(--replay-board-size);
+  }
+
+  /* In stacked mode the board may span the full viewport width, so keep the
+     tiny grip below it rather than protruding outside the viewport. */
+  .replay-board-resize-handle {
+    right: 0;
+    bottom: -0.75rem;
   }
 
   .replay-notation-controls {
