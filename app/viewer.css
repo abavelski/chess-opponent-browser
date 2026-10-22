@@ -61,14 +61,30 @@
   font-size: 0.82rem;
 }
 
-.lichess-game-viewer {
+.lichess-game-viewer,
+.lichess-viewer-host {
   min-width: 0;
   width: 100%;
 }
 
-.lichess-viewer-host {
+/* Lichess supplies the board and full variation tree. Match the old side-by-side
+   layout while keeping the board smaller than the move notation column. */
+.lichess-game-viewer .lpv--moves-right {
+  grid-template-columns: minmax(0, min(32rem, 48%)) minmax(0, 1fr);
+}
+
+.lichess-game-viewer .lpv__side {
   min-width: 0;
-  width: 100%;
+  min-height: 0;
+  border-left: 1px solid var(--border);
+}
+
+.lichess-game-viewer .lpv__moves {
+  min-height: 0;
+}
+
+.lichess-game-viewer {
+  container: replay-viewer / inline-size;
 }
 
 .lichess-game-viewer .lpv {
@@ -116,12 +132,31 @@
   font-size: 0.82rem;
 }
 
-.compact-lichess-game-viewer .lpv--moves-bottom {
-  grid-template-columns: minmax(0, 1fr);
+.compact-lichess-game-viewer .lpv--moves-right {
+  grid-template-columns: minmax(0, min(28rem, 48%)) minmax(0, 1fr);
 }
 
 .compact-lichess-game-viewer .lichess-viewer-help {
   font-size: 0.74rem;
+}
+
+/* Only stack the move list once the viewer itself is too narrow for both
+   the board and the notation; a desktop opponent sidebar may take space. */
+@container replay-viewer (max-width: 37rem) {
+  .lichess-game-viewer .lpv--moves-right,
+  .compact-lichess-game-viewer .lpv--moves-right {
+    grid-template-areas:
+      "board"
+      "controls"
+      "side";
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto var(--controls-height) 16rem;
+  }
+
+  .lichess-game-viewer .lpv__side {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
 }
 
 .viewer-unavailable {

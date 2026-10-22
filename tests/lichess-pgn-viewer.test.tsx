@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { makeGame } from "@lichess-org/pgn-viewer/pgn";
 
-import { GameViewer } from "../app/games/[gameId]/game-viewer";
+import { GameViewer, gameViewerOptions, replayShortcut } from "../app/games/[gameId]/game-viewer";
 
 const annotatedPgn = [
   '[Event "Preparation"]',
@@ -20,6 +20,46 @@ describe("Lichess PGN viewer integration", () => {
     expect(game.moves.children.map((child) => child.data.san)).toContain("d4");
     expect(game.mainline[0].comments).toContain("Central control");
     expect(game.players.white.name).toBe("Player A");
+  });
+
+  it("keeps the full notation to the right and enables Chessground drawing", () => {
+    const options = gameViewerOptions(annotatedPgn, "black");
+
+    expect(options.showMoves).toBe("right");
+    expect(options.orientation).toBe("black");
+    expect(options.drawArrows).toBe(true);
+    expect(options.showControls).toBe(true);
+    expect(options.keyboardToMove).toBe(false);
+    expect(options.pgn).toBe(annotatedPgn);
+  });
+
+  it("restores navigation and flip keys without consuming game-selection keys", () => {
+    function shortcut(key: string, modifiers: Partial<Parameters<typeof replayShortcut>[0]> = {}) {
+      return replayShortcut({
+        key,
+        altKey: false,
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        defaultPrevented: false,
+        ...modifiers,
+      });
+    }
+
+    expect(shortcut("ArrowLeft")).toBe("prev");
+    expect(shortcut("ArrowRight")).toBe("next");
+    expect(shortcut("Home")).toBe("first");
+    expect(shortcut("End")).toBe("last");
+    expect(shortcut("f")).toBe("flip");
+    expect(shortcut("F", { shiftKey: true })).toBe("flip");
+
+    for (const key of ["ArrowUp", "ArrowDown", "j", "k"]) {
+      expect(shortcut(key)).toBeNull();
+    }
+    expect(shortcut("ArrowRight", { ctrlKey: true })).toBeNull();
+    expect(shortcut("ArrowRight", { shiftKey: true })).toBeNull();
+    expect(shortcut("f", { defaultPrevented: true })).toBeNull();
+    expect(shortcut("Home", { metaKey: true })).toBeNull();
   });
 
   it("renders a stable React-owned host for compact and full-page games", () => {
