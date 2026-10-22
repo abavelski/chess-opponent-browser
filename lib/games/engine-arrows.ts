@@ -3,6 +3,14 @@ import type { EngineLine } from "./browser-stockfish";
 
 export const ENGINE_ARROW_BRUSH = "engineGrey";
 
+// Chessground scales the shaft and arrowhead from the lineWidth modifier.
+// Each principal variation keeps its own thickness even with a shared grey brush.
+export const ENGINE_ARROW_WIDTHS = [12, 8, 4] as const;
+
+export function engineArrowWidth(multiPv: number): number {
+  return ENGINE_ARROW_WIDTHS[Math.min(Math.max(multiPv, 1), 3) - 1];
+}
+
 // The arrows are Chessground auto-shapes, separate from both user markings and
 // Lichess's PGN annotations. Show only the first move of each principal variation.
 export function engineArrowShapes(lines: EngineLine[]): DrawShape[] {
@@ -19,6 +27,7 @@ export function engineArrowShapes(lines: EngineLine[]): DrawShape[] {
         orig: move.slice(0, 2) as DrawShape["orig"],
         dest: move.slice(2, 4) as DrawShape["dest"],
         brush: ENGINE_ARROW_BRUSH,
+        modifiers: { lineWidth: engineArrowWidth(line.multiPv) },
       }];
     });
 }
