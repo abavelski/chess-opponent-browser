@@ -439,7 +439,7 @@ export default async function PlayerPage({ params, searchParams }: PlayerPagePro
                       compact
                       initialOrientation={selectedGame.orientation}
                       key={selectedGame.id}
-                      replay={selectedGame.replay}
+                      pgn={selectedGame.originalPgn}
                     />
                   ) : (
                     <div className="panel empty-state compact-viewer-empty">

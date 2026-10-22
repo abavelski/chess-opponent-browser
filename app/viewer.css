@@ -61,214 +61,67 @@
   font-size: 0.82rem;
 }
 
-.viewer-layout {
-  display: grid;
-  grid-template-columns: minmax(20rem, 34rem) minmax(20rem, 1fr);
-  align-items: start;
-  gap: 1.25rem;
-}
-
-.board-column {
-  display: grid;
+.lichess-game-viewer {
   min-width: 0;
-  gap: 0.8rem;
-}
-
-.chessboard-library {
   width: 100%;
+}
+
+.lichess-viewer-host {
   min-width: 0;
-  overflow: hidden;
-  border: 1px solid #aab2a7;
+  width: 100%;
+}
+
+.lichess-game-viewer .lpv {
+  --c-lpv-bg: #fbfdf9;
+  --c-lpv-font: #172018;
+  --c-lpv-accent: #24543a;
+  --c-lpv-font-shy: #667066;
+  --c-lpv-bg-controls: #f0f2ed;
+  --c-lpv-bg-player: #fbfdf9;
+  --c-lpv-bg-movelist: #fbfdf9;
+  --c-lpv-bg-variation: #e7efe8;
+  --c-lpv-bg-pane: #f0f2ed;
+  --c-lpv-border: #d8ddd5;
+  border: 1px solid var(--border);
   border-radius: 0.7rem;
-  background: var(--surface);
   box-shadow: 0 0.3rem 1.2rem rgb(23 32 24 / 8%);
-}
-
-.chessboard-library > div {
+  font-size: 0.9rem;
+  max-width: 100%;
   width: 100%;
 }
 
-.viewer-controls {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.45rem;
+.lichess-game-viewer cg-board {
+  background-color: #f0d9b5;
+  background-image: conic-gradient(#b58863 25%, #f0d9b5 0 50%, #b58863 0 75%, #f0d9b5 0);
+  background-size: 25% 25%;
 }
 
-.viewer-control-button,
-.text-button {
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
+.lichess-viewer-help {
+  margin: 0.65rem 0 0;
+  color: var(--muted);
+  font-size: 0.79rem;
 }
 
-.viewer-control-button {
-  min-height: 3rem;
-  padding: 0.65rem 0.5rem;
-  border-radius: 0.6rem;
-}
-
-.viewer-control-button:hover:not(:disabled),
-.text-button:hover {
-  border-color: var(--focus);
-  background: var(--surface-muted);
-}
-
-.viewer-control-button:focus-visible,
-.text-button:focus-visible,
-.notation-move:focus-visible {
-  outline: 3px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.viewer-control-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.42;
-}
-
-.viewer-position-row {
-  display: flex;
-  min-height: 2.5rem;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.current-position-label {
-  font-weight: 700;
-}
-
-.text-button {
-  min-height: 2.4rem;
-  padding: 0.4rem 0.65rem;
-  border-radius: 0.5rem;
-}
-
-.notation-panel {
-  min-width: 0;
-  overflow: hidden;
-}
-
-.notation-heading-row {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1rem 1rem 0.85rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.notation-heading-row .eyebrow {
-  margin-bottom: 0.25rem;
-}
-
-.notation-heading-row .muted {
-  font-size: 0.8rem;
-  text-align: right;
-}
-
-.notation-scroll {
-  max-height: 36rem;
-  overflow-y: auto;
+.lichess-viewer-error {
   padding: 1rem;
-}
-
-.notation-annotation-controls {
-  display: flex;
-  gap: 0.4rem;
-  padding: 0.55rem 0.65rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.notation-annotation-controls button {
-  padding: 0.25rem 0.5rem;
   border: 1px solid var(--border);
-  border-radius: 0.35rem;
+  border-radius: 0.6rem;
   background: var(--surface);
-  color: var(--muted);
-  font: inherit;
-  font-size: 0.72rem;
-  cursor: pointer;
+  color: var(--danger);
 }
 
-.notation-annotation-controls button[aria-pressed="true"] {
-  border-color: var(--accent);
-  background: #e7efe8;
-  color: var(--accent-strong);
+.compact-lichess-game-viewer .lpv {
+  border-radius: 0.5rem;
+  box-shadow: none;
+  font-size: 0.82rem;
 }
 
-.notation-annotation-controls button:focus-visible {
-  outline: 3px solid var(--focus);
-  outline-offset: 2px;
+.compact-lichess-game-viewer .lpv--moves-bottom {
+  grid-template-columns: minmax(0, 1fr);
 }
 
-.notation-line {
-  display: grid;
-  gap: 0.2rem;
-}
-
-.notation-row {
-  display: grid;
-  grid-template-columns: 2.2rem repeat(2, minmax(0, 1fr));
-  align-items: start;
-  gap: 0.25rem;
-}
-
-.notation-cell {
-  min-width: 0;
-}
-
-.notation-cell-empty {
-  min-height: 2.45rem;
-}
-
-.notation-move {
-  display: flex;
-  width: 100%;
-  min-height: 2.45rem;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-  padding: 0.35rem 0.5rem;
-  border: 1px solid transparent;
-  border-radius: 0.45rem;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.notation-annotations {
-  color: var(--muted);
-  white-space: nowrap;
-  font-size: 0.7rem;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-}
-
-.notation-move > span:first-child {
-  white-space: nowrap;
-}
-
-.notation-move:hover {
-  border-color: var(--border);
-  background: var(--surface-muted);
-}
-
-.notation-move.is-current {
-  border-color: var(--accent);
-  background: #e7efe8;
-  color: var(--accent-strong);
-}
-
-.notation-number {
-  padding-top: 0.75rem;
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-variant-numeric: tabular-nums;
+.compact-lichess-game-viewer .lichess-viewer-help {
+  font-size: 0.74rem;
 }
 
 .viewer-unavailable {
@@ -286,19 +139,6 @@
 
   .viewer-metadata > div:nth-child(-n + 2) {
     border-bottom: 1px solid var(--border);
-  }
-
-  .viewer-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .board-column {
-    width: min(100%, 38rem);
-    margin: 0 auto;
-  }
-
-  .notation-scroll {
-    max-height: none;
   }
 }
 
@@ -319,91 +159,5 @@
 
   .viewer-metadata > div:last-child {
     border-bottom: 0;
-  }
-
-  .viewer-controls {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .viewer-position-row,
-  .notation-heading-row {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .notation-heading-row .muted {
-    text-align: left;
-  }
-}
-
-
-/* Embedded compact game review */
-.compact-viewer-layout {
-  grid-template-columns: minmax(24rem, 38rem) minmax(20rem, 26rem);
-  justify-content: start;
-  gap: 0.75rem;
-}
-
-.compact-viewer-layout .board-column {
-  gap: 0.45rem;
-}
-
-.compact-viewer-layout .chessboard-library {
-  border-radius: 0.45rem;
-  box-shadow: none;
-}
-
-.compact-viewer-controls {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.3rem;
-}
-
-.compact-viewer-controls .viewer-control-button {
-  min-height: 2.05rem;
-  padding: 0.3rem 0.35rem;
-  border-radius: 0.4rem;
-  font-size: 0.8rem;
-}
-
-.compact-position-label {
-  min-height: 1.2rem;
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 700;
-}
-
-.compact-notation-scroll {
-  max-height: 32rem;
-  padding: 0.65rem;
-}
-
-.compact-viewer-layout .notation-move {
-  min-height: 1.9rem;
-  padding: 0.22rem 0.34rem;
-  border-radius: 0.35rem;
-  font-size: 0.84rem;
-  gap: 0.2rem;
-}
-
-.compact-viewer-layout .notation-annotations {
-  font-size: 0.66rem;
-}
-
-.compact-viewer-layout .notation-number {
-  padding-top: 0.55rem;
-  font-size: 0.7rem;
-}
-
-@media (max-width: 1120px) {
-  .compact-viewer-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .compact-viewer-layout .board-column {
-    width: min(100%, 38rem);
-  }
-
-  .compact-notation-scroll {
-    max-height: 18rem;
   }
 }

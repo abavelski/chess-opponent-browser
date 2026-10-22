@@ -14,6 +14,8 @@ Chess Opponent Browser is a web application for tournament preparation and brows
 - npm
 - Vercel
 
+Game replay uses [Lichess PGN Viewer](https://github.com/lichess-org/pgn-viewer) (GPL-3.0-or-later). Its CSS and SVG chess pieces are bundled locally from the npm package.
+
 ## Requirements
 
 - Node.js 24 LTS

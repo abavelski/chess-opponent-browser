@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 import "./opponents.css";
 import "./games.css";
+import "../node_modules/@lichess-org/pgn-viewer/dist/lichess-pgn-viewer.css";
 import "./viewer.css";
 import "./imports.css";
 

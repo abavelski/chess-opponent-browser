@@ -58,6 +58,7 @@ export default async function GamePage({ params, searchParams }: GamePageProps) 
         eco: string | null;
         opening: string | null;
         sourceLabel: string;
+        originalPgn: string;
         structuredMoves: unknown;
       }
     | undefined;
@@ -77,6 +78,7 @@ export default async function GamePage({ params, searchParams }: GamePageProps) 
         eco: games.eco,
         opening: games.opening,
         sourceLabel: gameSources.label,
+        originalPgn: games.originalPgn,
         structuredMoves: games.structuredMoves,
       })
       .from(games)
@@ -142,7 +144,7 @@ export default async function GamePage({ params, searchParams }: GamePageProps) 
       </section>
 
       {replay ? (
-        <GameViewer replay={replay} />
+        <GameViewer pgn={game.originalPgn} />
       ) : (
         <section className="panel empty-state viewer-unavailable" role="status">
           <h2>Game moves unavailable</h2>
