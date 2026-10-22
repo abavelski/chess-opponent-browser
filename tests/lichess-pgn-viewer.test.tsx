@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { makeGame } from "@lichess-org/pgn-viewer/pgn";
 
-import { GameViewer, gameViewerOptions, replayShortcut } from "../app/games/[gameId]/game-viewer";
+import { GameViewer, constrainedBoardSize, gameViewerOptions, replayShortcut } from "../app/games/[gameId]/game-viewer";
 
 const annotatedPgn = [
   '[Event "Preparation"]',
@@ -28,7 +28,7 @@ describe("Lichess PGN viewer integration", () => {
     expect(options.showMoves).toBe("right");
     expect(options.orientation).toBe("black");
     expect(options.drawArrows).toBe(true);
-    expect(options.showControls).toBe(true);
+    expect(options.showControls).toBe(false);
     expect(options.keyboardToMove).toBe(false);
     expect(options.pgn).toBe(annotatedPgn);
   });
@@ -62,6 +62,14 @@ describe("Lichess PGN viewer integration", () => {
     expect(shortcut("Home", { metaKey: true })).toBeNull();
   });
 
+  it("constrains resizing to leave notation space alongside the board", () => {
+    expect(constrainedBoardSize(500, 1200)).toBe(500);
+    expect(constrainedBoardSize(900, 1200)).toBe(640);
+    expect(constrainedBoardSize(600, 800)).toBe(464);
+    expect(constrainedBoardSize(120, 900)).toBe(220);
+    expect(constrainedBoardSize(900, 350)).toBe(350);
+  });
+
   it("renders a stable React-owned host for compact and full-page games", () => {
     for (const compact of [false, true]) {
       const markup = renderToStaticMarkup(
@@ -69,6 +77,13 @@ describe("Lichess PGN viewer integration", () => {
       );
       expect(markup).toContain('class="lichess-viewer-host"');
       expect(markup).toContain("Chess game replay");
+      expect(markup).toContain("replay-board-resize-handle");
+      expect(markup).toContain("replay-notation-controls");
+      expect(markup).toContain("Go to beginning of game");
+      expect(markup).toContain("Previous move");
+      expect(markup).toContain("Next move");
+      expect(markup).toContain("Go to end of game");
+      expect(markup).toContain("Flip board orientation");
       if (compact) expect(markup).toContain("compact-lichess-game-viewer");
     }
   });
