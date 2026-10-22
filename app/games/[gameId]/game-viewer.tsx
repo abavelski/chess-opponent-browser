@@ -85,7 +85,7 @@ function isEditingTarget(target: EventTarget | null) {
   );
 }
 
-const initialNavigation: Navigation = { first: false, prev: false, next: false, last: false };
+const initialNavigation: Navigation = { first: false, prev: false, next: true, last: true };
 
 function navigationState(viewer: Viewer): Navigation {
   const previous = viewer.canGoTo("prev");
@@ -159,7 +159,6 @@ export function GameViewer({
         originalToPath(path, focus);
         setNavigation(navigationState(mountedViewer));
       };
-      setNavigation(navigationState(viewer));
     } catch (cause) {
       host.replaceChildren();
       const message = document.createElement("p");
@@ -246,7 +245,6 @@ export function GameViewer({
         <div className="replay-board-resize-region">
           <button
             aria-label="Resize chessboard"
-            aria-description="Drag diagonally, or use the arrow keys to resize the board and notation panel."
             className="replay-board-resize-handle"
             data-board-resize
             onKeyDown={resizeWithKeyboard}
