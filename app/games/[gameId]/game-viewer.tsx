@@ -27,7 +27,7 @@ export function constrainedBoardSize(requested: number, availableWidth: number) 
     Math.min(minimumBoardSize, availableWidth),
     Math.min(
       maximumBoardSize,
-      stacked ? availableWidth : Math.min(Math.floor(availableWidth * 0.58), availableWidth - 240),
+      stacked ? availableWidth : Math.min(Math.round(availableWidth * 0.58), availableWidth - 240),
     ),
   );
   return Math.max(Math.min(minimumBoardSize, max), Math.min(max, requested));
