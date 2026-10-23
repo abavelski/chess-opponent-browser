@@ -3,6 +3,10 @@
 
 # Next.js
 /.next/
+/.next-desktop/
+/desktop-dist/
+/desktop/node_modules/
+/tsconfig.desktop.json
 /out/
 
 # production

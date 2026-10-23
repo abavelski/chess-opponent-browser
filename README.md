@@ -196,6 +196,97 @@ The Vercel project is named `chess-opponent-browser` and uses the Next.js framew
 
 No custom domain or custom deployment script is required for the current milestone.
 
+## Offline desktop application
+
+The same pages, server actions, PGN importer, game viewer and Stockfish engine can
+also run in Electron with a local SQLite database. The hosted PostgreSQL app and
+its Vercel/GitHub workflows keep their existing commands and configuration.
+
+On Windows or macOS, install the normal dependencies, then run:
+
+```bash
+npm ci
+npm run desktop:build
+```
+
+This builds an installer for the current machine: a Windows `.exe` or a macOS
+`.dmg`, in `desktop-dist/`. Build on each target operating system; installers are
+unsigned personal builds. The first build needs internet access to install the
+separately locked Electron tools under `desktop/`. Subsequent builds reuse them.
+Node.js 22.17 or newer is required for local development (CI uses Node.js 24).
+Installed desktop applications include their own runtime and require neither
+Node.js nor a database server.
+
+For an unpacked application, use `npm run desktop:pack`. To open the most recent
+desktop build from the source checkout, use `npm run desktop:start`.
+The standalone Next.js server and its assets are built into `.next-desktop/`,
+independently of the web app's `.next/` output. Desktop-only generated TypeScript
+configuration lives in the ignored `tsconfig.desktop.json` file.
+
+On first launch, the app creates an **empty, independent** `chess.sqlite` database
+under Electron's application-data directory:
+
+- Windows: `%APPDATA%/chess-opponent-browser-desktop/chess.sqlite`
+- macOS: `~/Library/Application Support/chess-opponent-browser-desktop/chess.sqlite`
+
+Create tournaments and import PGN files in the app. Data persists across restarts
+and installer upgrades. No hosted data is copied or synchronized automatically,
+and desktop operations do not access `DATABASE_URL`. Close the app before backing
+up the database; SQLite may use adjacent `-wal` and `-shm` files while it is open.
+Browsing saved data, imports, replay and engine analysis work without internet.
+External profile links and fetching new data from online providers still require
+an internet connection. The existing CLI synchronization commands retain their
+hosted-app defaults; they are not background tasks in Electron.
+
+To copy the active web tournament into the desktop database, run:
+
+```bash
+npm run desktop:sync
+```
+
+Set `DATABASE_URL` in the shell or a local `.env.local` file to the source web
+database. This command uses read-only PostgreSQL transactions and never changes
+the hosted database. It backs up SQLite before merging, preserves existing local
+data and annotations, reuses saved PGN packs and `data/danbase.pgn`, and downloads
+only game bodies that are missing locally. The web roster selects which players
+and games to copy; local participant snapshots supply cached ratings and roster
+details where available. Sources, aliases and player IDs are mapped into the
+independent SQLite database. Distinct web games remain distinct, including games
+without duplicate fingerprints. Import history records this local copy rather
+than copying unrelated hosted import history.
+
+Re-running the command adds missing data without duplicating already copied
+games. Backups, downloaded game bodies and the last summary are kept under the
+ignored `data/desktop-sync/<nickname>/` directory. Use `--nickname <nickname>`
+to select a different tournament, `--database <sqlite-file>` to select another
+local database, `--local-pgn <file>` to scan one explicit PGN instead of the
+default local files, or `--cache-dir <directory>` to change the cache location.
+Reload the desktop window after a sync to display the new data. Credentials are
+used only by this explicit local command and are never bundled in Electron.
+
+The desktop build replaces only the database module. Its SQLite transport retains
+Drizzle's existing PostgreSQL parameter/result mapping and translates the SQL
+features currently used by the app, including atomic batches and writable CTEs.
+The initial SQLite tables, constraints and indexes are derived from
+`lib/db/schema.ts`; hosted Drizzle migrations are never run against SQLite.
+The desktop database records a schema version and fingerprint. Future schema
+changes must add an explicit desktop migration before opening older databases;
+an unrecognized schema is refused without discarding existing data. New
+PostgreSQL-specific query features need corresponding SQLite support and tests.
+
+`tests/desktop-database.test.ts` runs actual import, identity and administration
+queries against SQLite as part of the normal test suite, without installing
+Electron. After `desktop:pack`, this additional check uses Electron's own runtime
+and a hidden browser with nonlocal requests blocked:
+
+```bash
+node desktop/node_modules/electron/cli.js scripts/desktop-smoke.cjs
+```
+
+On Windows, add `--packaged` to check the unpacked installer contents as well.
+This check uses a temporary database and covers tournament creation/activation,
+PGN import, replay, local engine assets and saved data after a server restart.
+
 ## Git workflow
 
 This personal project normally commits directly to `main`; GitHub Actions and the Vercel Production deployment validate each push.

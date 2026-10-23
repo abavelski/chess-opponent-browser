@@ -5,5 +5,6 @@ import nextTs from "eslint-config-next/typescript";
 export default defineConfig([
   ...nextVitals,
   ...nextTs,
-  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", "public/stockfish/**"]),
+  globalIgnores([".next/**", ".next-desktop/**", "desktop-dist/**", "out/**", "build/**", "next-env.d.ts", "public/stockfish/**"]),
+  { files: ["desktop/*.cjs", "scripts/desktop-smoke.cjs"], rules: { "@typescript-eslint/no-require-imports": "off" } },
 ]);

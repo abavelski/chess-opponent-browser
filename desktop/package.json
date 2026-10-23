@@ -1,0 +1,24 @@
+{
+  "name": "chess-opponent-browser-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Offline Chess Opponent Browser",
+  "author": "Chess Opponent Browser",
+  "main": "main.cjs",
+  "devDependencies": {
+    "electron": "42.0.0",
+    "electron-builder": "26.0.12"
+  },
+  "build": {
+    "appId": "dk.chess-opponent-browser.desktop",
+    "productName": "Chess Opponent Browser",
+    "directories": { "output": "../desktop-dist" },
+    "files": ["main.cjs", "server.cjs", "package.json"],
+    "extraResources": [{ "from": "../.next-desktop/standalone", "to": "server", "filter": ["**/*", "!**/.env*", "!**/*.sqlite*"] }],
+    "win": { "target": "nsis", "signAndEditExecutable": false },
+    "mac": { "target": "dmg", "identity": null },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true },
+    "npmRebuild": false,
+    "publish": null
+  }
+}
